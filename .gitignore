@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# Virtual env
+venv/
+.venv/
+
+# Model dosyaları
+*.pth
+*.pt
+
+# Node.js (eğer varsa)
+node_modules/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Jupyter (varsa)
+.ipynb_checkpoints/
