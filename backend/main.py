@@ -39,3 +39,7 @@ async def predict(file: UploadFile = File(...)):
         _, predicted = torch.max(outputs, 1)
         predicted_class = class_names[predicted.item()]
     return {"prediction": predicted_class}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
