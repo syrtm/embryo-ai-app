@@ -273,7 +273,18 @@ function DoctorAnalysis() {
                     {Object.entries(analysisResult.details).map(([key, value]) => (
                       <div key={key} className="flex flex-col p-3 bg-gray-50 rounded-md">
                         <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} capitalize`}>{key}</span>
-                        <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{value}</span>
+                        <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {typeof value === 'object' ? 
+                            // If it's the vizuel object, render it properly
+                            Object.entries(value).map(([vizKey, vizValue]) => (
+                              <div key={vizKey} className="flex items-center mt-1">
+                                <span className="text-xs text-gray-500 mr-2">{vizKey.replace('_yildiz', '')}:</span>
+                                <span>{vizValue}</span>
+                              </div>
+                            ))
+                            : value
+                          }
+                        </span>
                       </div>
                     ))}
                   </div>
