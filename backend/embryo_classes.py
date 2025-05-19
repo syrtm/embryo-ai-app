@@ -8,7 +8,7 @@ EMBRYO_CLASSES = {
         'transfer_uygunlugu': 'Uygun – değerlendirilebilir, daha iyi kalite varsa öncelik verilebilir.',
         'risk_notu': 'Trofektoderm kalitesi göz önünde bulundurularak implantasyon şansı orta düzeydedir.',
         'vizuel': {
-            'fragmentasyon_yildiz': '★★★★☆',
+            'fragmentasyon yildiz': '★★★★☆',
             'simetri_yildiz': '★★★★☆',
             'genel_kalite': '★★★★☆'
         }
