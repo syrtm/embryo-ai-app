@@ -58,7 +58,7 @@ function Login({ onLogin }) {
             {error}
           </div>
         )}
-
+        
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700">Username</label>
@@ -111,12 +111,12 @@ function Login({ onLogin }) {
           </div>
 
           <div>
-            <button
-              type="submit"
+          <button
+            type="submit"
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
-            >
+          >
               Sign in
-            </button>
+          </button>
           </div>
 
           <div className="flex items-center justify-between">

@@ -12,6 +12,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 import io
 import base64
+from torchvision import models
 
 app = Flask(__name__)
 CORS(app)
@@ -60,7 +61,7 @@ def init_db():
                 )
             ''')
             print("Users tablosu oluşturuldu!")
-
+            
             # Hasta-Doktor ilişki tablosu
             cursor.execute('''
                 CREATE TABLE doctor_patient_relations (
@@ -88,9 +89,9 @@ def init_db():
                     FOREIGN KEY (patient_id) REFERENCES users (id),
                     FOREIGN KEY (doctor_id) REFERENCES users (id)
                 )
-            ''')
+                ''')
             print("Reports tablosu oluşturuldu!")
-            
+        
             conn.commit()
         else:
             print("Tablolar zaten mevcut.")
@@ -139,15 +140,15 @@ def register():
                 INSERT INTO users (full_name, email, username, password, role)
                 VALUES (?, ?, ?, ?, ?)
             """, (
-                data['fullName'],
-                data['email'],
-                data['username'],
-                hashed_password.decode('utf-8'),
-                data['role']
-            ))
+                    data['fullName'],
+                    data['email'],
+                    data['username'],
+                    hashed_password.decode('utf-8'),
+                    data['role']
+                ))
             conn.commit()
 
-        return jsonify({"success": True, "message": "Kayıt başarılı"}), 201
+            return jsonify({"success": True, "message": "Kayıt başarılı"}), 201
 
     except Exception as e:
         print(f"Kayıt hatası: {str(e)}")
@@ -716,47 +717,105 @@ EMBRYO_CLASSES = {
 
 # Model yükleme fonksiyonu
 def load_model():
-    model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
-    model.eval()
-    return model
+    try:
+        # ResNet50 modelini oluştur
+        model = models.resnet50()
+        
+        # Eğitilmiş model ağırlıklarını yükle
+        checkpoint = torch.load("best_resnet50_clean.pth", map_location=torch.device("cpu"))
+        
+        # Modeli yeniden yapılandır - tam olarak kaydedilen modele uygun olacak şekilde
+        num_classes = 19  # Kaydedilen modeldeki sınıf sayısı
+        model.fc = torch.nn.Sequential(
+            torch.nn.Dropout(0.5),
+            torch.nn.Linear(model.fc.in_features, num_classes)
+        )
+        
+        model.load_state_dict(checkpoint)
+        model.eval()
+        return model
+    except Exception as e:
+        print(f"Model yükleme hatası: {str(e)}")
+        raise
 
 # Model tahmin fonksiyonu
 def predict_embryo_class(image_data):
     try:
+        print("Tahmin işlemi başlıyor...")
         # Base64'ten resmi decode et
         image_bytes = base64.b64decode(image_data.split(',')[1])
         image = Image.open(io.BytesIO(image_bytes))
+        print(f"Resim başarıyla açıldı. Boyut: {image.size}, Format: {image.format}")
         
-        # Resmi model için hazırla
+        # Resmi model için hazırla - eğitim sırasında kullanılan dönüşümlerle tam olarak eşleştir
         transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+            transforms.Resize((224, 224)),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225]
-            )
+            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
         ])
         
+        print("Resim dönüştürülüyor...")
         input_tensor = transform(image)
+        print(f"Tensor boyutu: {input_tensor.shape}")
         input_batch = input_tensor.unsqueeze(0)
+        print(f"Batch tensor boyutu: {input_batch.shape}")
         
         # Model tahmini yap
+        print("Model yükleniyor...")
         model = load_model()
+        print("Model yüklendi, tahmin yapılıyor...")
+        
         with torch.no_grad():
             output = model(input_batch)
+            print(f"Model çıktı boyutu: {output.shape}")
             
         # En yüksek olasılıklı sınıfı bul
         _, predicted_idx = torch.max(output, 1)
-        predicted_class = list(EMBRYO_CLASSES.keys())[predicted_idx.item()]
+        print(f"Tahmin edilen indeks: {predicted_idx.item()}")
+        
+        # main.py'deki sınıf isimleri ile eşleştir
+        class_names = [
+            "2-1-1", "2-1-2", "2-1-3", "2-2-1", "2-2-2", "2-2-3",
+            "2-3-3",
+            "3-1-1", "3-1-2", "3-1-3",
+            "3-2-1", "3-2-2", "3-2-3",
+            "3-3-2", "3-3-3",
+            "4-2-2",
+            "Arrested", "Early", "Morula"
+        ]
+
+
+        # İndeksin sınıf listesinin sınırları içinde olduğundan emin ol
+        if predicted_idx.item() >= len(class_names):
+            print(f"UYARI: Tahmin indeksi ({predicted_idx.item()}) sınıf listesinin uzunluğundan ({len(class_names)}) büyük!")
+            predicted_idx = torch.tensor([len(class_names) - 1])  # Son sınıfı kullan
+        
+        predicted_class = class_names[predicted_idx.item()]
+        print(f"Tahmin edilen sınıf: {predicted_class}")
+        
+        # Tahmin güvenini hesapla
+        probabilities = torch.nn.functional.softmax(output, dim=1)[0]
+        confidence = probabilities[predicted_idx.item()].item() * 100  # Yüzde olarak
+        print(f"Güven skoru: %{round(confidence, 2)}")
         
         # Sınıf detaylarını al
-        class_details = EMBRYO_CLASSES[predicted_class]
+        if predicted_class in EMBRYO_CLASSES:
+            class_details = EMBRYO_CLASSES[predicted_class]
+            print(f"Sınıf detayları: {class_details}")
+        else:
+            print(f"UYARI: {predicted_class} sınıfı EMBRYO_CLASSES sözlüğünde bulunamadı!")
+            class_details = {
+                'hücre_sayısı': 'Bilinmiyor',
+                'fragmentasyon': 'Bilinmiyor',
+                'simetri': 'Bilinmiyor'
+            }
         
+        print("Tahmin işlemi tamamlandı.")
         return {
             'success': True,
             'class': predicted_class,
-            'details': class_details
+            'details': class_details,
+            'confidence': round(confidence, 2)
         }
         
     except Exception as e:

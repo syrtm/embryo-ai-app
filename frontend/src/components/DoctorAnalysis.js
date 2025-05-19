@@ -23,7 +23,7 @@ function DoctorAnalysis() {
         const imageData = e.target.result;
         setSelectedImage(imageData);
         
-        try {
+    try {
           // Model tahminini al
           const response = await fetch('http://localhost:5000/api/analyze-embryo', {
             method: 'POST',
@@ -35,14 +35,14 @@ function DoctorAnalysis() {
           
           const result = await response.json();
           if (result.success) {
-            setAnalysisResult({
+        setAnalysisResult({
               class: result.class,
               details: result.details
             });
           } else {
             console.error('Tahmin hatası:', result.error);
           }
-        } catch (error) {
+    } catch (error) {
           console.error('API hatası:', error);
         }
       };
@@ -253,10 +253,15 @@ function DoctorAnalysis() {
                     <div className={`px-4 py-2 rounded-lg font-bold text-2xl ${isDarkMode ? 'bg-teal-900 text-teal-200' : 'bg-teal-100 text-teal-800'} shadow-sm`}>
                       Sınıf: {analysisResult.class}
                     </div>
+                    {analysisResult.confidence && (
+                      <div className={`px-3 py-1 rounded-lg text-sm ${isDarkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`}>
+                        Güven: %{analysisResult.confidence}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className={`p-5 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm border ${isDarkMode ? 'border-slate-600' : 'border-gray-100'}`}> 
+                <div className={`p-5 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm border ${isDarkMode ? 'border-slate-600' : 'border-gray-100'}`}>
                   <h3 className={`text-lg font-medium mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />

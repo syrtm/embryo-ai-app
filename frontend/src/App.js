@@ -41,9 +41,9 @@ function DoctorRoutes({ onLogout }) {
         <Route path="/messages" element={<Messages />} />
         <Route path="/appointments" element={<Appointments />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/patients" element={<Patients />} />
-        <Route path="/profile" element={<DoctorProfile />} />
-        <Route path="/analysis" element={<DoctorAnalysis />} />
+      <Route path="/patients" element={<Patients />} />
+      <Route path="/profile" element={<DoctorProfile />} />
+      <Route path="/analysis" element={<DoctorAnalysis />} />
       </Routes>
     </DashboardLayout>
   );
@@ -60,7 +60,7 @@ function App() {
   });
 
   const handleLogin = (credentials) => {
-    setIsAuthenticated(true);
+      setIsAuthenticated(true);
     setUserRole(credentials.role);
   };
 
