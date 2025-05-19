@@ -15,48 +15,38 @@ function DoctorAnalysis() {
   const displayName = selectedPatient?.name || selectedPatient?.full_name || '';
   const displayAge = selectedPatient?.age !== undefined ? selectedPatient.age : (selectedPatient?.age || '');
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
     if (file) {
-      setSelectedImage(URL.createObjectURL(file));
-      setAnalysisResult(null); // Reset any previous analysis
-    }
-  };
-
-  const handleAnalysis = async () => {
-    if (!selectedImage || !selectedPatient) return;
-    
-    setIsAnalyzing(true);
-    
-    // Simulate API call to backend
-    try {
-      // In a real app, this would be an actual API call to the backend
-      // const response = await fetch('http://localhost:8000/predict', {
-      //   method: 'POST',
-      //   body: formData
-      // });
-      // const data = await response.json();
-      
-      // Mock response for now
-      setTimeout(() => {
-        setAnalysisResult({
-          grade: 'AA',
-          confidence: 92,
-          details: {
-            morphology: 'Excellent',
-            fragmentation: 'Minimal (< 10%)',
-            cellCount: 8,
-            symmetry: 'High',
-            multinucleation: 'None detected'
-          },
-          recommendation: 'This embryo shows excellent morphological features with minimal fragmentation. It is recommended for transfer.',
-          timestamp: new Date().toISOString()
-        });
-        setIsAnalyzing(false);
-      }, 2000);
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      setIsAnalyzing(false);
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const imageData = e.target.result;
+        setSelectedImage(imageData);
+        
+        try {
+          // Model tahminini al
+          const response = await fetch('http://localhost:5000/api/analyze-embryo', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: imageData })
+          });
+          
+          const result = await response.json();
+          if (result.success) {
+            setAnalysisResult({
+              class: result.class,
+              details: result.details
+            });
+          } else {
+            console.error('Tahmin hatası:', result.error);
+          }
+        } catch (error) {
+          console.error('API hatası:', error);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -245,37 +235,6 @@ function DoctorAnalysis() {
                 </div>
               </div>
             )}
-
-            {selectedImage && selectedPatient && (
-              <div className="mt-6">
-                <button
-                  onClick={handleAnalysis}
-                  disabled={isAnalyzing}
-                  className={`w-full px-4 py-3 rounded-lg shadow-md transition-all duration-150 font-medium flex items-center justify-center
-                    ${isAnalyzing 
-                      ? 'bg-gray-400 text-gray-700 cursor-not-allowed' 
-                      : 'bg-teal-600 text-white hover:bg-teal-700'
-                    }`}
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      Start Analysis
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Results section */}
@@ -292,24 +251,18 @@ function DoctorAnalysis() {
                 <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                   <div className="flex items-center space-x-3">
                     <div className={`px-4 py-2 rounded-lg font-bold text-2xl ${isDarkMode ? 'bg-teal-900 text-teal-200' : 'bg-teal-100 text-teal-800'} shadow-sm`}>
-                      Grade: {analysisResult.grade}
+                      Sınıf: {analysisResult.class}
                     </div>
-                    <div className={`px-3 py-1 rounded-lg text-sm ${isDarkMode ? 'bg-indigo-900 text-indigo-200' : 'bg-indigo-100 text-indigo-800'} shadow-sm`}>
-                      {analysisResult.confidence}% confidence
-                    </div>
-                  </div>
-                  <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} bg-gray-50 px-2 py-1 rounded-md`}>
-                    {new Date(analysisResult.timestamp).toLocaleString()}
                   </div>
                 </div>
 
-                <div className={`p-5 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm border ${isDarkMode ? 'border-slate-600' : 'border-gray-100'}`}>
+                <div className={`p-5 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm border ${isDarkMode ? 'border-slate-600' : 'border-gray-100'}`}> 
                   <h3 className={`text-lg font-medium mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                       <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
                     </svg>
-                    Detailed Assessment
+                    Detaylı Değerlendirme
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     {Object.entries(analysisResult.details).map(([key, value]) => (
@@ -320,31 +273,6 @@ function DoctorAnalysis() {
                     ))}
                   </div>
                 </div>
-
-                <div className={`p-5 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm border ${isDarkMode ? 'border-slate-600' : 'border-gray-100'}`}>
-                  <h3 className={`text-lg font-medium mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    Recommendation
-                  </h3>
-                  <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'} bg-gray-50 p-3 rounded-md`}>{analysisResult.recommendation}</p>
-                </div>
-
-                <div className="flex space-x-3 pt-4 border-t border-gray-200">
-                  <button className="flex-1 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white transition-colors shadow-sm flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Save Report
-                  </button>
-                  <button className="flex-1 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 transition-colors shadow-sm flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    Print
-                  </button>
-                </div>
               </div>
             ) : (
               <div className={`flex flex-col items-center justify-center h-64 ${isDarkMode ? 'bg-slate-700' : 'bg-white'} rounded-xl p-6 border ${isDarkMode ? 'border-slate-600' : 'border-gray-200'} shadow-sm`}>
@@ -353,11 +281,11 @@ function DoctorAnalysis() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
-                <p className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-700'}`}>No Analysis Results Yet</p>
+                <p className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-700'}`}>Henüz analiz sonucu yok</p>
                 <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} text-center mt-2`}>
                   {selectedImage 
-                    ? "Click 'Start Analysis' to analyze the uploaded embryo image"
-                    : "Please upload an embryo image first"}
+                    ? "Resim yüklendi, analiz sonucu bekleniyor."
+                    : "Lütfen önce bir embriyo resmi yükleyin"}
                 </p>
               </div>
             )}

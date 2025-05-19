@@ -7,6 +7,11 @@ import re
 import bcrypt
 from werkzeug.utils import secure_filename
 import time
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+import io
+import base64
 
 app = Flask(__name__)
 CORS(app)
@@ -524,6 +529,262 @@ def reset_passwords():
             'success': False,
             'message': 'Şifreler güncellenirken bir hata oluştu'
         }), 500
+
+# Model sınıf tanımlamaları
+EMBRYO_CLASSES = {
+    '1-1-1': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'İyi'
+    },
+    '1-1-2': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'Orta'
+    },
+    '1-1-3': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'Kötü'
+    },
+    '1-2-1': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Orta',
+        'simetri': 'İyi'
+    },
+    '1-2-2': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Orta',
+        'simetri': 'Orta'
+    },
+    '1-2-3': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Orta',
+        'simetri': 'Kötü'
+    },
+    '1-3-1': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'İyi'
+    },
+    '1-3-2': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'Orta'
+    },
+    '1-3-3': {
+        'hücre_sayısı': '1',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'Kötü'
+    },
+    '2-1-1': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'İyi'
+    },
+    '2-1-2': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'Orta'
+    },
+    '2-1-3': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'Kötü'
+    },
+    '2-2-1': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Orta',
+        'simetri': 'İyi'
+    },
+    '2-2-2': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Orta',
+        'simetri': 'Orta'
+    },
+    '2-2-3': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Orta',
+        'simetri': 'Kötü'
+    },
+    '2-3-1': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'İyi'
+    },
+    '2-3-2': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'Orta'
+    },
+    '2-3-3': {
+        'hücre_sayısı': '2',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'Kötü'
+    },
+    '3-1-1': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'İyi'
+    },
+    '3-1-2': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'Orta'
+    },
+    '3-1-3': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'Kötü'
+    },
+    '3-2-1': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Orta',
+        'simetri': 'İyi'
+    },
+    '3-2-2': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Orta',
+        'simetri': 'Orta'
+    },
+    '3-2-3': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Orta',
+        'simetri': 'Kötü'
+    },
+    '3-3-1': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'İyi'
+    },
+    '3-3-2': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'Orta'
+    },
+    '3-3-3': {
+        'hücre_sayısı': '3',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'Kötü'
+    },
+    '4-1-1': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'İyi'
+    },
+    '4-1-2': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'Orta'
+    },
+    '4-1-3': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Düşük',
+        'simetri': 'Kötü'
+    },
+    '4-2-1': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Orta',
+        'simetri': 'İyi'
+    },
+    '4-2-2': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Orta',
+        'simetri': 'Orta'
+    },
+    '4-2-3': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Orta',
+        'simetri': 'Kötü'
+    },
+    '4-3-1': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'İyi'
+    },
+    '4-3-2': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'Orta'
+    },
+    '4-3-3': {
+        'hücre_sayısı': '4',
+        'fragmentasyon': 'Yüksek',
+        'simetri': 'Kötü'
+    }
+}
+
+# Model yükleme fonksiyonu
+def load_model():
+    model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
+    model.eval()
+    return model
+
+# Model tahmin fonksiyonu
+def predict_embryo_class(image_data):
+    try:
+        # Base64'ten resmi decode et
+        image_bytes = base64.b64decode(image_data.split(',')[1])
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Resmi model için hazırla
+        transform = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
+        ])
+        
+        input_tensor = transform(image)
+        input_batch = input_tensor.unsqueeze(0)
+        
+        # Model tahmini yap
+        model = load_model()
+        with torch.no_grad():
+            output = model(input_batch)
+            
+        # En yüksek olasılıklı sınıfı bul
+        _, predicted_idx = torch.max(output, 1)
+        predicted_class = list(EMBRYO_CLASSES.keys())[predicted_idx.item()]
+        
+        # Sınıf detaylarını al
+        class_details = EMBRYO_CLASSES[predicted_class]
+        
+        return {
+            'success': True,
+            'class': predicted_class,
+            'details': class_details
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+@app.route('/api/analyze-embryo', methods=['POST'])
+def analyze_embryo():
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+        
+        if not image_data:
+            return jsonify({
+                'success': False,
+                'error': 'Resim verisi bulunamadı'
+            })
+            
+        result = predict_embryo_class(image_data)
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 if __name__ == '__main__':
     init_db()
