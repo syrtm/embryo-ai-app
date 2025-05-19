@@ -1,14 +1,47 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import embryoLogo from '../assets/embryo-ai-logo.svg';
+import { Link, useNavigate } from 'react-router-dom';
+import embryoLogo from '../assets/embryo-ai-logo.png';
 
 function Login({ onLogin }) {
-  const [credentials, setCredentials] = useState({ email: '', password: '' });
-  const [role, setRole] = useState('patient'); // Default to patient
+  const navigate = useNavigate();
+  const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [error, setError] = useState('');
+  const [role, setRole] = useState('patient');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onLogin(credentials);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: credentials.username,
+          password: credentials.password,
+          role: role
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Giriş başarısız oldu');
+      }
+
+      if (data.success) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        onLogin({ ...credentials, role: data.user.role });
+        navigate(data.user.role === 'doctor' ? '/doctor' : '/patient');
+      } else {
+        setError(data.message || 'Giriş başarısız oldu');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message || 'Giriş sırasında bir hata oluştu');
+    }
   };
 
   return (
@@ -19,39 +52,34 @@ function Login({ onLogin }) {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent mb-2">EmbryoAI</h1>
           <p className="text-gray-500">Sign in to your account</p>
         </div>
-        
+
+        {error && (
+          <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Username</label>
             <input
-              type="email"
-              placeholder="Enter your email"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500"
-              value={credentials.email}
-              onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
+              type="text"
+              value={credentials.username}
+              onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-rose-500 focus:border-rose-500"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Password</label>
             <input
               type="password"
-              placeholder="Enter your password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500"
               value={credentials.password}
               onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-rose-500 focus:border-rose-500"
               required
             />
-            <div className="mt-1">
-              <Link to="/forgot-password" className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
-                Forgot your password?
-              </Link>
-            </div>
           </div>
 
           <div className="mt-6 mb-4">
@@ -64,13 +92,7 @@ function Login({ onLogin }) {
                   name="role"
                   value="patient"
                   checked={role === 'patient'}
-                  onChange={(e) => {
-                    setRole(e.target.value);
-                    setCredentials(prev => ({
-                      ...prev,
-                      email: e.target.value === 'doctor' ? 'doctor@example.com' : 'patient@example.com'
-                    }));
-                  }}
+                  onChange={(e) => setRole(e.target.value)}
                 />
                 <span className="ml-2 text-gray-800">Patient</span>
               </label>
@@ -81,29 +103,34 @@ function Login({ onLogin }) {
                   name="role"
                   value="doctor"
                   checked={role === 'doctor'}
-                  onChange={(e) => {
-                    setRole(e.target.value);
-                    setCredentials(prev => ({
-                      ...prev,
-                      email: e.target.value === 'doctor' ? 'doctor@example.com' : 'patient@example.com'
-                    }));
-                  }}
+                  onChange={(e) => setRole(e.target.value)}
                 />
                 <span className="ml-2 text-gray-800">Doctor</span>
               </label>
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-rose-600 to-rose-500 text-white py-3 px-4 rounded-lg hover:from-rose-700 hover:to-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 transition-all duration-150 font-medium shadow-md mt-6"
-          >
-            Sign In
-          </button>
+          <div>
+            <button
+              type="submit"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
+            >
+              Sign in
+            </button>
+          </div>
 
-          <p className="text-center text-sm text-gray-600 mt-6">
-            Don't have an account? <Link to="/signup" className="text-rose-600 hover:text-rose-500 font-medium">Sign up</Link>
-          </p>
+          <div className="flex items-center justify-between">
+            <div className="text-sm">
+              <Link to="/forgot-password" className="font-medium text-rose-600 hover:text-rose-500">
+                Forgot your password?
+              </Link>
+            </div>
+            <div className="text-sm">
+              <Link to="/signup" className="font-medium text-rose-600 hover:text-rose-500">
+                Create an account
+              </Link>
+            </div>
+          </div>
         </form>
       </div>
     </div>

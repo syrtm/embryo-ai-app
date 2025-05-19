@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import embryoLogo from '../assets/embryo-ai-logo.svg';
+import embryoLogo from '../assets/embryo-ai-logo.png';
 
 function DashboardLayout({ children, userRole, onLogout }) {
   const location = useLocation();
@@ -107,8 +107,8 @@ function DashboardLayout({ children, userRole, onLogout }) {
                       <p className="text-xs text-gray-500">{userRole === 'doctor' ? 'Fertility Specialist' : 'Patient'}</p>
                     </div>
                   </div>
-                  <Link to="/profile" className={`block px-4 py-2 hover:${isDarkMode ? 'bg-slate-700' : 'bg-teal-50'} transition-colors duration-150`}>Profile</Link>
-                  <Link to="/settings" className={`block px-4 py-2 hover:${isDarkMode ? 'bg-slate-700' : 'bg-teal-50'} transition-colors duration-150`}>Settings</Link>
+                  <Link to={userRole === 'doctor' ? '/doctor/profile' : '/patient/profile'} className={`block px-4 py-2 hover:${isDarkMode ? 'bg-slate-700' : 'bg-teal-50'} transition-colors duration-150`}>Profile</Link>
+                  <Link to={userRole === 'doctor' ? '/doctor/settings' : '/patient/settings'} className={`block px-4 py-2 hover:${isDarkMode ? 'bg-slate-700' : 'bg-teal-50'} transition-colors duration-150`}>Settings</Link>
                   <button 
                     onClick={onLogout} 
                     className={`w-full text-left block px-4 py-2 text-red-500 hover:${isDarkMode ? 'bg-slate-700' : 'bg-teal-50'} transition-colors duration-150`}

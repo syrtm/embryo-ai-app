@@ -3,17 +3,17 @@
   "name": "EmbryoAI | Advanced Embryo Analysis Platform",
   "icons": [
     {
-      "src": "images/embryo-ai-logo.svg",
+      "src": "images/embryo-ai-logo.png",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/svg+xml"
     },
     {
-      "src": "images/embryo-ai-logo.svg",
+      "src": "images/embryo-ai-logo.png",
       "type": "image/svg+xml",
       "sizes": "192x192"
     },
     {
-      "src": "images/embryo-ai-logo.svg",
+      "src": "images/embryo-ai-logo.png",
       "type": "image/svg+xml",
       "sizes": "512x512"
     }

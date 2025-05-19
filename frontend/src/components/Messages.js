@@ -1,67 +1,58 @@
 import React, { useState } from 'react';
 
-function Messages() {
+// Kadın hastalar (doktor için gösterilecek kişiler)
+const patientContacts = [
+  { id: 1, name: 'Emma Thompson', role: 'Patient', avatar: 'https://randomuser.me/api/portraits/women/44.jpg', online: true },
+  { id: 2, name: 'Sarah Johnson', role: 'Patient', avatar: 'https://randomuser.me/api/portraits/women/65.jpg', online: false },
+  { id: 3, name: 'Lisa Davis', role: 'Patient', avatar: 'https://randomuser.me/api/portraits/women/63.jpg', online: true },
+  { id: 4, name: 'Emily Brown', role: 'Patient', avatar: 'https://randomuser.me/api/portraits/women/68.jpg', online: true }
+];
+
+// Doktorlar (hasta için gösterilecek kişiler)
+const doctorContacts = [
+  { id: 101, name: 'Dr. Smith', role: 'IVF Specialist', avatar: '/doctor-avatar.jpg', online: true },
+  { id: 102, name: 'Dr. Johnson', role: 'Embryologist', avatar: '/doctor-avatar-2.jpg', online: false }
+];
+
+// Başlangıçta her kişi için örnek mesajlar (İngilizce ve doktor gönderen olarak)
+const initialMessages = {
+  1: [
+    { id: 1, senderId: 'doctor', senderName: 'Dr. Smith', content: 'Hello Emma, how are you feeling today?', timestamp: '09:00' },
+    { id: 2, senderId: 'patient', senderName: 'Emma Thompson', content: "I am feeling good, thank you doctor.", timestamp: '09:01' }
+  ],
+  2: [
+    { id: 1, senderId: 'doctor', senderName: 'Dr. Smith', content: 'Your results look very promising.', timestamp: '10:30' }
+  ],
+  3: [],
+  4: []
+};
+
+function Messages({ userRole = 'doctor', doctorName = 'Dr. Smith' }) {
+  // userRole prop'u ile role kontrolü (varsayılan: doktor)
+  const contacts = userRole === 'doctor' ? patientContacts : doctorContacts;
   const [selectedContact, setSelectedContact] = useState(null);
   const [newMessage, setNewMessage] = useState('');
+  const [messagesByContact, setMessagesByContact] = useState(initialMessages);
 
-  // Mock data
-  const contacts = [
-    {
-      id: 1,
-      name: 'Dr. Smith',
-      role: 'IVF Specialist',
-      avatar: '/doctor-avatar.jpg',
-      online: true,
-      lastMessage: 'Your latest test results look promising.',
-      timestamp: '10:30 AM'
-    },
-    {
-      id: 2,
-      name: 'Dr. Johnson',
-      role: 'Embryologist',
-      avatar: '/doctor-avatar-2.jpg',
-      online: false,
-      lastMessage: "We'll discuss the analysis results tomorrow.",
-      timestamp: 'Yesterday'
-    },
-    {
-      id: 3,
-      name: 'Nurse Williams',
-      role: 'IVF Nurse',
-      avatar: '/nurse-avatar.jpg',
-      online: true,
-      lastMessage: "Don't forget your appointment tomorrow at 9 AM.",
-      timestamp: 'Yesterday'
-    }
-  ];
-
-  const messages = [
-    {
-      id: 1,
-      senderId: 1,
-      content: 'Hello Sarah, how are you feeling today?',
-      timestamp: '10:00 AM'
-    },
-    {
-      id: 2,
-      senderId: 'me',
-      content: "Hi Dr. Smith, I'm feeling good. Just a bit nervous about the results.",
-      timestamp: '10:05 AM'
-    },
-    {
-      id: 3,
-      senderId: 1,
-      content: 'I understand. Your latest test results look promising. Would you like to schedule a video call to discuss them in detail?',
-      timestamp: '10:30 AM'
-    }
-  ];
+  const currentMessages = selectedContact ? (messagesByContact[selectedContact.id] || []) : [];
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
-
-    // In a real app, this would send the message to the backend
-    console.log('Sending message:', newMessage);
+    if (!newMessage.trim() || !selectedContact) return;
+    const updated = {
+      ...messagesByContact,
+      [selectedContact.id]: [
+        ...(messagesByContact[selectedContact.id] || []),
+        {
+          id: Date.now(),
+          senderId: userRole === 'doctor' ? 'doctor' : 'patient',
+          senderName: userRole === 'doctor' ? doctorName : selectedContact.name,
+          content: newMessage,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]
+    };
+    setMessagesByContact(updated);
     setNewMessage('');
   };
 
@@ -103,13 +94,7 @@ function Messages() {
                           {contact.role}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500">{contact.timestamp}</p>
-                      </div>
                     </div>
-                    <p className="mt-1 text-sm text-gray-500 truncate">
-                      {contact.lastMessage}
-                    </p>
                   </button>
                 ))}
               </div>
@@ -138,29 +123,26 @@ function Messages() {
 
                   {/* Messages */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((message) => (
+                    {currentMessages.length === 0 && (
+                      <div className="text-center text-gray-400">No messages yet.</div>
+                    )}
+                    {currentMessages.map((message) => (
                       <div
                         key={message.id}
                         className={`flex ${
-                          message.senderId === 'me' ? 'justify-end' : 'justify-start'
+                          message.senderId === (userRole === 'doctor' ? 'doctor' : 'patient') ? 'justify-end' : 'justify-start'
                         }`}
                       >
                         <div
                           className={`max-w-lg rounded-lg px-4 py-2 ${
-                            message.senderId === 'me'
+                            message.senderId === (userRole === 'doctor' ? 'doctor' : 'patient')
                               ? 'bg-red-600 text-white'
                               : 'bg-gray-100 text-gray-900'
                           }`}
                         >
                           <p className="text-sm">{message.content}</p>
-                          <p
-                            className={`text-xs mt-1 ${
-                              message.senderId === 'me'
-                                ? 'text-red-100'
-                                : 'text-gray-500'
-                            }`}
-                          >
-                            {message.timestamp}
+                          <p className={`text-xs mt-1 ${message.senderId === (userRole === 'doctor' ? 'doctor' : 'patient') ? 'text-red-100' : 'text-gray-500'}`}>
+                            {message.senderName} • {message.timestamp}
                           </p>
                         </div>
                       </div>

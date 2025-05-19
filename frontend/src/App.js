@@ -14,6 +14,8 @@ import Settings from './components/Settings';
 import LandingPage from './components/LandingPage';
 import ForgotPassword from './components/ForgotPassword';
 import DashboardLayout from './components/DashboardLayout';
+import Patients from './components/Patients';
+import DoctorProfile from './pages/doctor/DoctorProfile';
 
 function PatientRoutes({ onLogout }) {
   return (
@@ -39,32 +41,33 @@ function DoctorRoutes({ onLogout }) {
         <Route path="/messages" element={<Messages />} />
         <Route path="/appointments" element={<Appointments />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/patients" element={<Patients />} />
+        <Route path="/profile" element={<DoctorProfile />} />
+        <Route path="/analysis" element={<DoctorAnalysis />} />
       </Routes>
     </DashboardLayout>
   );
 }
 
-// Separate route for analysis page (outside of DashboardLayout)
-function DoctorAnalysisRoute() {
-  return <DoctorAnalysis />;
-}
-
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const user = localStorage.getItem('user');
+    return !!user;
+  });
+  const [userRole, setUserRole] = useState(() => {
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user).role : null;
+  });
 
   const handleLogin = (credentials) => {
-    // Mock authentication
-    if (credentials.email && credentials.password) {
-      setIsAuthenticated(true);
-      // Set role based on email (mock logic)
-      setUserRole(credentials.email.includes('doctor') ? 'doctor' : 'patient');
-    }
+    setIsAuthenticated(true);
+    setUserRole(credentials.role);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setUserRole(null);
+    localStorage.removeItem('user');
   };
 
   return (
@@ -109,18 +112,6 @@ function App() {
             element={
               isAuthenticated && userRole === 'doctor' ? (
                 <DoctorRoutes onLogout={handleLogout} />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
-          
-          {/* Dedicated Analysis Route */}
-          <Route
-            path="/doctor/analysis"
-            element={
-              isAuthenticated && userRole === 'doctor' ? (
-                <DoctorAnalysisRoute />
               ) : (
                 <Navigate to="/login" />
               )

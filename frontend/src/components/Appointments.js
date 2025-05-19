@@ -5,31 +5,44 @@ function Appointments() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
+  const [selectedPatient, setSelectedPatient] = useState('');
 
   // Mock data
   const appointments = [
     {
       id: 1,
-      date: '2025-05-05',
-      time: '09:00',
+      patient: {
+        name: 'Emma Thompson',
+        photo: 'https://randomuser.me/api/portraits/women/44.jpg',
+      },
       doctor: 'Dr. Smith',
       type: 'Follow-up Consultation',
+      date: 'Monday, May 5, 2025',
+      time: '09:00',
       status: 'upcoming'
     },
     {
       id: 2,
-      date: '2025-05-10',
-      time: '14:30',
+      patient: {
+        name: 'Sarah Johnson',
+        photo: 'https://randomuser.me/api/portraits/women/65.jpg',
+      },
       doctor: 'Dr. Johnson',
       type: 'Embryo Transfer Discussion',
+      date: 'Saturday, May 10, 2025',
+      time: '14:30',
       status: 'upcoming'
     },
     {
       id: 3,
-      date: '2025-04-28',
-      time: '11:00',
+      patient: {
+        name: 'Lisa Davis',
+        photo: 'https://randomuser.me/api/portraits/women/63.jpg',
+      },
       doctor: 'Dr. Smith',
       type: 'Initial Consultation',
+      date: 'Monday, April 28, 2025',
+      time: '11:00',
       status: 'completed'
     }
   ];
@@ -47,10 +60,18 @@ function Appointments() {
     'Results Review'
   ];
 
+  // Kadın hastalar listesi
+  const patients = [
+    { name: 'Emma Thompson', photo: 'https://randomuser.me/api/portraits/women/44.jpg' },
+    { name: 'Sarah Johnson', photo: 'https://randomuser.me/api/portraits/women/65.jpg' },
+    { name: 'Lisa Davis', photo: 'https://randomuser.me/api/portraits/women/63.jpg' },
+  ];
+
   const handleBookAppointment = (e) => {
     e.preventDefault();
     // In a real app, this would send the booking to the backend
-    console.log('Booking appointment:', { selectedDate, selectedTime, selectedType });
+    const patientObj = patients.find(p => p.name === selectedPatient);
+    console.log('Booking appointment:', { selectedPatient: patientObj, selectedDate, selectedTime, selectedType });
     setShowBooking(false);
   };
 
@@ -87,68 +108,38 @@ function Appointments() {
         </div>
 
         {/* Upcoming Appointments */}
-        <div className="bg-white shadow-sm rounded-lg overflow-hidden mb-8 border border-teal-100">
-          <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-white flex justify-between items-center">
-            <div className="flex items-center">
-              <div className="bg-teal-100 p-2 rounded-full mr-3">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-green-50 rounded-xl p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <span className="bg-green-200 text-green-700 rounded-full p-2">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-              </div>
-              <h2 className="text-lg font-medium text-gray-900">Upcoming Appointments</h2>
+              </span>
+              <span className="text-lg font-semibold">Upcoming Appointments</span>
             </div>
-            <span className="bg-teal-100 text-teal-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-              {appointments.filter(apt => apt.status === 'upcoming').length} Scheduled
-            </span>
+            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">{appointments.filter(a => a.status === 'upcoming').length} Scheduled</span>
           </div>
-          <div className="divide-y divide-gray-200">
-            {appointments
-              .filter(apt => apt.status === 'upcoming')
-              .map(appointment => (
-                <div key={appointment.id} className="p-6 hover:bg-gray-50 transition-colors duration-150">
-                  <div className="flex items-start justify-between">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <img 
-                          src={doctorAvatars[appointment.doctor]} 
-                          alt={appointment.doctor} 
-                          className="h-14 w-14 rounded-full object-cover border-2 border-teal-200 shadow-sm" 
-                        />
+          {appointments.filter(a => a.status === 'upcoming').map(app => (
+            <div key={app.id} className="flex items-center space-x-6 bg-white rounded-xl shadow p-5 mb-6 border border-gray-100">
+              <img src={app.patient.photo} alt={app.patient.name} className="w-16 h-16 rounded-full object-cover border-2 border-teal-500" />
+              <div className="flex-1">
+                <div className="font-semibold text-lg">{app.type}</div>
+                <div className="text-gray-700">{app.patient.name}</div>
+                <div className="text-sm text-gray-500 flex items-center"><svg className="w-4 h-4 mr-1 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" /></svg>Doctor: {app.doctor}</div>
                       </div>
-                      <div className="ml-4">
-                        <h3 className="text-lg font-medium text-gray-900">{appointment.type}</h3>
-                        <div className="flex items-center mt-1">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-teal-500 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                          </svg>
-                          <p className="text-sm text-gray-600">{appointment.doctor}</p>
+              <div className="flex flex-col items-end">
+                <div className="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-right mb-2">
+                  <div className="text-xs">{app.date}</div>
+                  <div className="text-2xl font-bold">{app.time}</div>
                         </div>
+                <div className="flex space-x-2">
+                  <button className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg flex items-center"><svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Reschedule</button>
+                  <button className="bg-red-100 text-red-700 px-3 py-1 rounded-lg flex items-center"><svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>Cancel</button>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="bg-teal-50 px-3 py-2 rounded-lg inline-block">
-                        <p className="text-sm font-medium text-gray-900">{formatDate(appointment.date)}</p>
-                        <p className="text-xl font-bold text-teal-700 mt-1">{appointment.time}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-6 flex justify-end space-x-3">
-                    <button className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-medium transition-colors duration-150 flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-                      </svg>
-                      Reschedule
-                    </button>
-                    <button className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-md text-sm font-medium transition-colors duration-150 flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      Cancel
-                    </button>
                   </div>
                 </div>
               ))}
-          </div>
         </div>
 
         {/* Past Appointments */}
@@ -164,30 +155,30 @@ function Appointments() {
           <div className="divide-y divide-gray-200">
             {appointments
               .filter(apt => apt.status === 'completed')
-              .map(appointment => (
-                <div key={appointment.id} className="p-6 hover:bg-gray-100 transition-colors duration-150">
+              .map(app => (
+                <div key={app.id} className="p-6 hover:bg-gray-100 transition-colors duration-150">
                   <div className="flex items-start justify-between">
                     <div className="flex">
                       <div className="flex-shrink-0">
                         <img 
-                          src={doctorAvatars[appointment.doctor]} 
-                          alt={appointment.doctor} 
+                          src={app.patient.photo} 
+                          alt={app.patient.name} 
                           className="h-12 w-12 rounded-full object-cover border border-gray-200 filter grayscale opacity-75" 
                         />
                       </div>
                       <div className="ml-4">
-                        <h3 className="text-base font-medium text-gray-700">{appointment.type}</h3>
+                        <h3 className="text-base font-medium text-gray-700">{app.type}</h3>
                         <div className="flex items-center mt-1">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-1" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                           </svg>
-                          <p className="text-sm text-gray-500">{appointment.doctor}</p>
+                          <p className="text-sm text-gray-500">{app.doctor}</p>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-gray-700">{formatDate(appointment.date)}</p>
-                      <p className="text-sm text-gray-500 mt-1">{appointment.time}</p>
+                      <p className="text-sm font-medium text-gray-700">{app.date}</p>
+                      <p className="text-sm text-gray-500 mt-1">{app.time}</p>
                       <span className="inline-flex items-center mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
                         Completed
                       </span>
@@ -238,6 +229,29 @@ function Appointments() {
                     </p>
                     
                     <form onSubmit={handleBookAppointment} className="mt-6 space-y-6 text-left">
+                      <div>
+                        <label htmlFor="patient" className="block text-sm font-medium text-gray-700 mb-1">
+                          <div className="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                            </svg>
+                            Patient
+                          </div>
+                        </label>
+                        <select
+                          id="patient"
+                          required
+                          value={selectedPatient}
+                          onChange={e => setSelectedPatient(e.target.value)}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
+                        >
+                          <option value="">Select a patient</option>
+                          {patients.map(p => (
+                            <option key={p.name} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div>
                         <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
                           <div className="flex items-center">

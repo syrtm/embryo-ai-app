@@ -1,157 +1,161 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import embryoLogo from '../assets/embryo-ai-logo.png';
 
 function SignUp() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     username: '',
     password: '',
     confirmPassword: '',
-    agreeToTerms: false
+    role: 'patient'  // Varsayılan rol
   });
+  const [error, setError] = useState('');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle sign up logic here
-    console.log('Sign up data:', formData);
+    setError('');
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Şifreler eşleşmiyor');
+      return;
+    }
+
+    if (!agreeToTerms) {
+      setError('Devam etmek için şartları kabul etmelisiniz');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          username: formData.username,
+          password: formData.password,
+          role: formData.role
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Kayıt işlemi başarısız oldu');
+      }
+
+      if (data.success) {
+        navigate('/login');
+      } else {
+        setError(data.message);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 flex">
-      {/* Left side - Illustration */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center pr-8">
-        <div className="w-full max-w-md">
-          <svg viewBox="0 0 400 400" className="w-full h-auto">
-            <rect width="400" height="400" fill="#f3f4f6" rx="20"/>
-            {/* Desk */}
-            <rect x="50" y="250" width="300" height="10" fill="#94a3b8"/>
-            <rect x="70" y="260" width="10" height="100" fill="#94a3b8"/>
-            <rect x="320" y="260" width="10" height="100" fill="#94a3b8"/>
-            
-            {/* Monitor */}
-            <rect x="100" y="100" width="200" height="140" fill="#ffffff" stroke="#475569" strokeWidth="4"/>
-            <rect x="170" y="240" width="60" height="20" fill="#475569"/>
-            <rect x="150" y="260" width="100" height="5" fill="#475569"/>
-            
-            {/* Screen Content - Embryo */}
-            <circle cx="200" cy="170" r="40" fill="#fee2e2"/>
-            <circle cx="200" cy="170" r="30" fill="#fecaca"/>
-            <circle cx="200" cy="170" r="20" fill="#ef4444"/>
-            
-            {/* Person */}
-            <circle cx="160" cy="280" r="15" fill="#1f2937"/> {/* Head */}
-            <rect x="155" y="295" width="10" height="30" fill="#1f2937"/> {/* Body */}
-            <rect x="145" y="310" width="30" height="10" fill="#1f2937"/> {/* Arms */}
-            <rect x="155" y="325" width="10" height="20" fill="#1f2937"/> {/* Legs */}
-            
-            {/* Chair */}
-            <rect x="140" y="320" width="40" height="5" fill="#64748b"/>
-            <rect x="155" y="325" width="10" height="30" fill="#64748b"/>
-          </svg>
-        </div>
-      </div>
-
-      {/* Right side - Sign up form */}
-      <div className="w-full lg:w-1/2 max-w-md mx-auto">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-xl p-10 border border-gray-100">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Sign up</h1>
-          <p className="text-gray-600 mt-2">Sign up to access EmbryoAI services</p>
+          <img src={embryoLogo} alt="EmbryoAI Logo" className="h-16 w-16 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent mb-2">EmbryoAI</h1>
+          <p className="text-gray-500">Create your account</p>
         </div>
+
+        {error && (
+          <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Full name</label>
-            <div className="mt-1 relative">
-              <input
-                type="text"
-                placeholder="First Last"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                required
-              />
-              <span className="absolute right-3 top-2.5 text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </span>
-            </div>
+            <label className="block text-sm font-medium text-gray-700">Full Name</label>
+            <input
+              type="text"
+              value={formData.fullName}
+              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-rose-500 focus:border-rose-500"
+              required
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Email</label>
-            <div className="mt-1 relative">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-              />
-              <span className="absolute right-3 top-2.5 text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </span>
-            </div>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-rose-500 focus:border-rose-500"
+              required
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Username</label>
-            <div className="mt-1 relative">
-              <input
-                type="text"
-                placeholder="Choose a username"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                required
-              />
-              <span className="absolute right-3 top-2.5 text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </span>
-            </div>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-rose-500 focus:border-rose-500"
+              required
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Set your password</label>
-            <div className="mt-1 relative">
-              <input
-                type="password"
-                placeholder="••••••••••••••••"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-              />
-              <span className="absolute right-3 top-2.5 text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-              </span>
-            </div>
+            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <input
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-rose-500 focus:border-rose-500"
+              required
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Confirm password</label>
-            <div className="mt-1 relative">
-              <input
-                type="password"
-                placeholder="••••••••••••••••"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                required
-              />
-              <span className="absolute right-3 top-2.5 text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </span>
+            <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
+            <input
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-rose-500 focus:border-rose-500"
+              required
+            />
+          </div>
+
+          <div className="mt-6 mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">I am a:</label>
+            <div className="flex items-center space-x-6 bg-gray-50 p-3 rounded-lg">
+              <label className="inline-flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  className="form-radio h-5 w-5 text-rose-600 focus:ring-rose-500"
+                  name="role"
+                  value="patient"
+                  checked={formData.role === 'patient'}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                />
+                <span className="ml-2 text-gray-800">Patient</span>
+              </label>
+              <label className="inline-flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  className="form-radio h-5 w-5 text-rose-600 focus:ring-rose-500"
+                  name="role"
+                  value="doctor"
+                  checked={formData.role === 'doctor'}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                />
+                <span className="ml-2 text-gray-800">Doctor</span>
+              </label>
             </div>
           </div>
 
@@ -159,26 +163,35 @@ function SignUp() {
             <input
               type="checkbox"
               id="terms"
-              className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-              checked={formData.agreeToTerms}
-              onChange={(e) => setFormData({ ...formData, agreeToTerms: e.target.checked })}
-              required
+              checked={agreeToTerms}
+              onChange={(e) => setAgreeToTerms(e.target.checked)}
+              className="h-4 w-4 text-rose-600 focus:ring-rose-500 border-gray-300 rounded"
             />
             <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-              I agree with <a href="#" className="text-red-600 hover:text-red-500">Terms</a> and <a href="#" className="text-red-600 hover:text-red-500">Privacy Policy</a>.
+              I agree to the{' '}
+              <Link to="/terms" className="text-rose-600 hover:text-rose-500">
+                Terms and Conditions
+              </Link>
             </label>
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
-          >
-            Join now
-          </button>
+          <div>
+            <button
+              type="submit"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
+            >
+              Register
+            </button>
+          </div>
 
-          <p className="text-center text-sm text-gray-600">
-            Already a member? <Link to="/login" className="text-red-600 hover:text-red-500">Log in</Link>
-          </p>
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link to="/login" className="font-medium text-rose-600 hover:text-rose-500">
+                Sign in
+              </Link>
+            </p>
+          </div>
         </form>
       </div>
     </div>

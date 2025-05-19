@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import embryoLogo from '../assets/embryo-ai-logo.svg';
+import embryoLogo from '../assets/embryo-ai-logo.png';
 
 function DoctorDashboard() {
   /* ------------------------------------------------------------------
@@ -56,10 +56,10 @@ function DoctorDashboard() {
   ];
 
   const patients = [
-    { id: 1, name: 'Emma Thompson', age: 34, status: 'Waiting for Upload', avatar: '👩🏼' },
-    { id: 2, name: 'Sarah Johnson', age: 29, status: 'Analysis Complete', avatar: '👩🏻' },
-    { id: 3, name: 'Lisa Davis', age: 31, status: 'Waiting for Upload', avatar: '👩🏽' },
-    { id: 4, name: 'Michael Brown', age: 36, status: 'Analysis Complete', avatar: '👨🏻' }
+    { id: 1, name: 'Emma Thompson', age: 34, status: 'Waiting for Upload', avatar: '👩🏼', photo: 'https://randomuser.me/api/portraits/women/44.jpg' },
+    { id: 2, name: 'Sarah Johnson', age: 29, status: 'Analysis Complete', avatar: '👩🏻', photo: 'https://randomuser.me/api/portraits/women/65.jpg' },
+    { id: 3, name: 'Lisa Davis', age: 31, status: 'Waiting for Upload', avatar: '👩🏽', photo: 'https://randomuser.me/api/portraits/women/63.jpg' },
+    { id: 4, name: 'Emily Brown', age: 36, status: 'Analysis Complete', avatar: '👩🏼', photo: 'https://randomuser.me/api/portraits/women/68.jpg' }
   ];
 
   const notifications = [
@@ -240,24 +240,13 @@ function DoctorDashboard() {
                     >
                       <div className="flex items-center space-x-4">
                         <div className={`relative flex-shrink-0 w-12 h-12 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} flex items-center justify-center shadow-sm overflow-hidden`}>
+                          <img src={p.photo} alt="Patient" className="w-full h-full object-cover" />
                           {selected && (
                             <div className="absolute -top-1 -right-1 bg-teal-500 rounded-full w-5 h-5 flex items-center justify-center border-2 border-white z-10">
                               <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                               </svg>
                             </div>
-                          )}
-                          {p.avatar === '👩🏻' && (
-                            <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Patient" className="w-full h-full object-cover" />
-                          )}
-                          {p.avatar === '👩🏻' && (
-                            <img src="https://randomuser.me/api/portraits/women/65.jpg" alt="Patient" className="w-full h-full object-cover" />
-                          )}
-                          {p.avatar === '👩🏽' && (
-                            <img src="https://randomuser.me/api/portraits/women/63.jpg" alt="Patient" className="w-full h-full object-cover" />
-                          )}
-                          {p.avatar === '👨🏻' && (
-                            <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Patient" className="w-full h-full object-cover" />
                           )}
                         </div>
                         <div className="text-left">

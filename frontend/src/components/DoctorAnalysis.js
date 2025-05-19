@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import embryoLogo from '../assets/embryo-ai-logo.svg';
+import embryoLogo from '../assets/embryo-ai-logo.png';
 
 function DoctorAnalysis() {
   const navigate = useNavigate();
@@ -12,6 +12,8 @@ function DoctorAnalysis() {
 
   // Get the selected patient from location state or use a default
   const selectedPatient = location.state?.patient || null;
+  const displayName = selectedPatient?.name || selectedPatient?.full_name || '';
+  const displayAge = selectedPatient?.age !== undefined ? selectedPatient.age : (selectedPatient?.age || '');
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -60,56 +62,10 @@ function DoctorAnalysis() {
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-gray-50 text-slate-900'}`}>
-      {/* Header */}
-      <header className={`${isDarkMode ? 'bg-slate-800' : 'bg-white'} shadow-md py-4 px-6 sticky top-0 z-10`}>
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <img src={embryoLogo} alt="EmbryoAI Logo" className="h-10 w-10" />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-500 to-indigo-500 bg-clip-text text-transparent">EmbryoAI</h1>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <button 
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-1 rounded-full ${isDarkMode ? 'bg-slate-700 text-yellow-300' : 'bg-gray-200 text-slate-700'}`}
-              title="Toggle theme"
-            >
-              {isDarkMode ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                </svg>
-              )}
-            </button>
-            <div className="flex items-center space-x-2">
-              <span className="text-xl">👨🏻‍⚕️</span>
-              <span className={`${isDarkMode ? 'text-white' : 'text-gray-700'} font-medium`}>Dr. Smith</span>
-            </div>
-          </div>
-        </div>
-      </header>
+      
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Breadcrumb navigation */}
-        <div className="mb-6 flex items-center">
-          <button 
-            onClick={() => navigate('/doctor')} 
-            className="flex items-center text-gray-600 hover:text-teal-600 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-            </svg>
-            <span>Dashboard</span>
-          </button>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mx-2 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
-          <span className="font-medium text-gray-900">Embryo Analysis</span>
-        </div>
-
+      
         {/* Patient banner */}
         {selectedPatient ? (
           <div className={`mb-6 ${isDarkMode ? 'bg-teal-900' : 'bg-teal-50'} rounded-xl p-4 shadow-sm border ${isDarkMode ? 'border-teal-800' : 'border-teal-200'}`}>
@@ -119,11 +75,9 @@ function DoctorAnalysis() {
                   <span className="text-2xl">{selectedPatient.avatar}</span>
                 </div>
                 <div>
-                  <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {selectedPatient.name}
-                  </h3>
+                  <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{displayName}</h3>
                   <div className="flex items-center mt-1 space-x-3">
-                    <span className={`text-sm ${isDarkMode ? 'text-teal-300' : 'text-teal-700'}`}>Age: {selectedPatient.age}</span>
+                    <span className={`text-sm ${isDarkMode ? 'text-teal-300' : 'text-teal-700'}`}>Age: {displayAge}</span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       Selected Patient
                     </span>
