@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import patientAvatars from '../utils/patientAvatars';
 
 function Appointments() {
   const [showBooking, setShowBooking] = useState(false);
@@ -55,12 +56,18 @@ function Appointments() {
           // Parse the date and time
           const dateTime = new Date(appointment.date_time);
           
+          // Patient name (other party for doctor, self for patient)
+          const patientName = user.role === 'doctor' ? appointment.other_party_name : user.username;
+          
+          // Get photo from patientAvatars or use default
+          const patientPhoto = patientAvatars[patientName] || 'https://randomuser.me/api/portraits/women/44.jpg';
+          
           return {
             id: appointment.id,
             patient: {
               id: appointment.patient_id,
-              name: user.role === 'doctor' ? appointment.other_party_name : user.username,
-              photo: 'https://randomuser.me/api/portraits/women/44.jpg', // Default patient photo
+              name: patientName,
+              photo: patientPhoto,
             },
             doctor: {
               name: user.role === 'patient' ? appointment.other_party_name : user.username,
@@ -175,11 +182,11 @@ function Appointments() {
   ];
 
   const appointmentTypes = [
-    'İlk Konsultasyon',
-    'Takip Konsultasyonu',
-    'Embriyo Transfer Görüşmesi',
-    'Tedavi Planlaması',
-    'Sonuç Değerlendirme'
+    'Initial Consultation',
+    'Follow-up Consultation',
+    'Embryo Transfer Discussion',
+    'Treatment Planning',
+    'Results Evaluation'
   ];
 
   // This mock data is now replaced by the patients state from API
@@ -190,7 +197,7 @@ function Appointments() {
       // Get the current user
       const user = JSON.parse(localStorage.getItem('user'));
       if (!user || !user.id) {
-        throw new Error('Kullanıcı kimliği doğrulanamadı');
+        throw new Error('User ID could not be verified');
       }
       
       // Determine patient and doctor IDs based on user role
@@ -199,14 +206,14 @@ function Appointments() {
       if (user.role === 'doctor') {
         // If user is a doctor, they select a patient
         if (!selectedPatient) {
-          throw new Error('Lütfen bir hasta seçin');
+          throw new Error('Please select a patient');
         }
         patientId = selectedPatient; // We're now using the ID directly from the select
         doctorId = user.id; // Doctor is the current user
       } else {
         // If user is a patient, they select a doctor
         if (!selectedDoctor) {
-          throw new Error('Lütfen bir doktor seçin');
+          throw new Error('Please select a doctor');
         }
         patientId = user.id; // Patient is the current user
         doctorId = selectedDoctor; // We're now using the ID directly from the select
@@ -214,12 +221,12 @@ function Appointments() {
       
       // Format the date and time
       if (!selectedDate || !selectedTime) {
-        throw new Error('Lütfen tarih ve saat seçin');
+        throw new Error('Please select date and time');
       }
       const dateTime = `${selectedDate}T${selectedTime}:00`;
       
       if (!selectedType) {
-        throw new Error('Lütfen randevu türünü seçin');
+        throw new Error('Please select appointment type');
       }
       
       console.log('Booking appointment with:', {
@@ -249,13 +256,13 @@ function Appointments() {
         // Close the booking form and refresh appointments
         setShowBooking(false);
         fetchAppointments();
-        alert('Randevu başarıyla oluşturuldu!');
+        alert('Appointment created successfully!');
       } else {
-        throw new Error(result.message || 'Randevu oluşturulurken bir hata oluştu');
+        throw new Error(result.message || 'An error occurred while creating the appointment');
       }
     } catch (err) {
       console.error('Error booking appointment:', err);
-      alert(err.message || 'Randevu oluşturulurken bir hata oluştu');
+      alert(err.message || 'An error occurred while creating the appointment');
     }
   };
 
@@ -277,8 +284,8 @@ function Appointments() {
         {/* Header with aligned button */}
         <div className="mb-8 flex justify-between items-center">
           <div className="flex-1">
-            <h1 className="text-2xl font-semibold text-gray-900">Randevular</h1>
-            <p className="text-sm text-gray-500 mt-1">Planlanmış randevularınızı yönetin</p>
+            <h1 className="text-2xl font-semibold text-gray-900">Appointments</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage your scheduled appointments</p>
           </div>
           <button
             onClick={() => setShowBooking(true)}
@@ -483,10 +490,10 @@ function Appointments() {
                   
                   <div className="text-center sm:mt-5">
                     <h3 className="text-xl leading-6 font-semibold text-gray-900">
-                      Yeni Randevu Oluştur
+                      Create New Appointment
                     </h3>
                     <p className="text-sm text-gray-500 mt-2">
-                      Lütfen tercih ettiğiniz tarihi, saati ve randevu türünü seçin.
+                      Please select your preferred date, time, and appointment type.
                     </p>
                     
                     <form onSubmit={handleBookAppointment} className="mt-6 space-y-6 text-left">
@@ -498,7 +505,7 @@ function Appointments() {
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                               </svg>
-                              Hasta
+                              Patient
                             </div>
                           </label>
                           <select
@@ -508,7 +515,7 @@ function Appointments() {
                             onChange={e => setSelectedPatient(e.target.value)}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
                           >
-                            <option value="">Hasta seu00e7in</option>
+                            <option value="">Select patient</option>
                             {patients.map(p => (
                               <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
@@ -524,7 +531,7 @@ function Appointments() {
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                               </svg>
-                              Doktor
+                              Doctor
                             </div>
                           </label>
                           <select
@@ -534,7 +541,7 @@ function Appointments() {
                             onChange={e => setSelectedDoctor(e.target.value)}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
                           >
-                            <option value="">Doktor Seçiniz</option>
+                            <option value="">Select doctor</option>
                             {doctors.map(d => (
                               <option key={d.id} value={d.id}>{d.name} ({d.specialization})</option>
                             ))}
@@ -548,7 +555,7 @@ function Appointments() {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                             </svg>
-                            Tarih
+                            Date
                           </div>
                         </label>
                         <input
@@ -567,7 +574,7 @@ function Appointments() {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                             </svg>
-                            Saat
+                            Time
                           </div>
                         </label>
                         <select
@@ -577,7 +584,7 @@ function Appointments() {
                           onChange={(e) => setSelectedTime(e.target.value)}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
                         >
-                          <option value="">Saat seçin</option>
+                          <option value="">Select time</option>
                           {availableTimes.map(time => (
                             <option key={time} value={time}>{time}</option>
                           ))}
@@ -590,7 +597,7 @@ function Appointments() {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                             </svg>
-                            Randevu Türü
+                            Appointment Type
                           </div>
                         </label>
                         <select
@@ -600,7 +607,7 @@ function Appointments() {
                           onChange={(e) => setSelectedType(e.target.value)}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm"
                         >
-                          <option value="">Randevu türü seçin</option>
+                          <option value="">Select appointment type</option>
                           {appointmentTypes.map(type => (
                             <option key={type} value={type}>{type}</option>
                           ))}
@@ -616,7 +623,7 @@ function Appointments() {
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                           </svg>
-                          İptal
+                          Cancel
                         </button>
                         <button
                           type="submit"
@@ -625,7 +632,7 @@ function Appointments() {
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
-                          Randevu Oluştur
+                          Create Appointment
                         </button>
                       </div>
                     </form>

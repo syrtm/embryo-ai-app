@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, make_response
+from flask import Flask, request, jsonify, send_file, make_response, send_from_directory
 from flask_cors import CORS
 import sqlite3
 from werkzeug.security import generate_password_hash
@@ -34,21 +34,149 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Uploads klasöründeki dosyaları servis etmek için endpoint
+@app.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/api/patient/profile/<username>', methods=['GET'])
+def get_patient_profile(username):
+    try:
+        # Token kontrolü yap
+        token = request.headers.get('Authorization')
+        if not token or not token.startswith('Bearer '):
+            return jsonify({"success": False, "message": "Kimlik doğrulama gerekli"}), 401
+
+        # Veritabanına bağlan
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Kullanıcıyı bul
+        cursor.execute('''
+            SELECT * FROM users 
+            WHERE username = ? AND role = 'patient'
+        ''', (username,))
+        
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({"success": False, "message": "Hasta bulunamadı"}), 404
+
+        # Hasta detaylarını al
+        cursor.execute('''
+            SELECT * FROM patient_details 
+            WHERE user_id = ?
+        ''', (user[0],))
+        
+        patient_details = cursor.fetchone()
+        
+        # Profil verilerini hazırla
+        profile_data = {
+            "id": user[0],
+            "username": user[3],
+            "fullName": user[1],
+            "email": user[2],
+            "phone": patient_details[2] if patient_details else None,
+            "dateOfBirth": user[7] if len(user) > 7 else None,  # date_of_birth from users table
+            "address": patient_details[4] if patient_details else None,
+            "bloodType": patient_details[5] if patient_details else None,
+            "emergencyContact": patient_details[6] if patient_details else None,
+            "emergencyPhone": patient_details[7] if patient_details else None,
+            "allergies": patient_details[8] if patient_details else None,
+            "medicalHistory": patient_details[9] if patient_details else None
+        }
+
+        return jsonify({"success": True, "patient": profile_data})
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@app.route('/api/patient/profile/<username>', methods=['PUT'])
+def update_patient_profile(username):
+    try:
+        # Token kontrolü yap
+        token = request.headers.get('Authorization')
+        if not token or not token.startswith('Bearer '):
+            return jsonify({"success": False, "message": "Kimlik doğrulama gerekli"}), 401
+
+        # Veritabanına bağlan
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Kullanıcıyı bul
+        cursor.execute('SELECT * FROM users WHERE username = ?', (username,))
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({"success": False, "message": "Kullanıcı bulunamadı"}), 404
+
+        # Gelen verileri al
+        data = request.get_json()
+        print(f"Updating profile for user: {username}")
+        print(f"Received update data: {data}")
+        
+        # Yaş hesapla (eğer doğum tarihi varsa)
+        birth_date = data.get('dateOfBirth')
+        age = None
+        if birth_date:
+            from datetime import datetime
+            try:
+                birth_date = datetime.strptime(birth_date, '%Y-%m-%d')
+                today = datetime.now()
+                age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+            except ValueError:
+                print(f"Invalid date format: {birth_date}")
+
+        # Kullanıcı bilgilerini güncelle
+        cursor.execute('''
+            UPDATE users 
+            SET phone = ?, address = ?, blood_type = ?, emergency_contact = ?, 
+                emergency_phone = ?, allergies = ?, medical_history = ?, 
+                date_of_birth = ?, age = ?
+            WHERE id = ?
+        ''', (
+            data.get('phone', ''),
+            data.get('address', ''),
+            data.get('bloodType', ''),
+            data.get('emergencyContact', ''),
+            data.get('emergencyPhone', ''),
+            data.get('allergies', ''),
+            data.get('medicalHistory', ''),
+            data.get('dateOfBirth'),  # Birth date
+            age,
+            user[0]
+        ))
+        
+        # Kontrol et: kaç satır güncellendi?
+        if cursor.rowcount == 0:
+            return jsonify({"success": False, "message": "Profil bulunamadı"}), 404
+            
+        conn.commit()
+        
+        return jsonify({"success": True, "message": "Profil başarıyla güncellendi"})
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error updating profile: {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
 def init_db():
     try:
-        # Veritabanı dosyasının bulunduğu dizini oluştur
-        os.makedirs(os.path.dirname(DB_NAME), exist_ok=True)
-        
-        # Veritabanına bağlan
+        # Veritabanı bağlantısını oluştur
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
         # Tabloların var olup olmadığını kontrol et
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-        if not cursor.fetchone():
+        tables = cursor.fetchall()
+        
+        # Tablolar yoksa oluştur
+        if not tables:
             print("Tablolar oluşturuluyor...")
-            
-            # Users tablosunu oluştur
             cursor.execute('''
                 CREATE TABLE users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,6 +186,7 @@ def init_db():
                     password TEXT NOT NULL,
                     role TEXT NOT NULL,
                     age INTEGER,
+                    date_of_birth TEXT,
                     phone TEXT,
                     address TEXT,
                     blood_type TEXT,
@@ -68,22 +197,50 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
-            print("Users tablosu oluşturuldu!")
             
-            # Hasta-Doktor ilişki tablosu
             cursor.execute('''
-                CREATE TABLE doctor_patient_relations (
+                CREATE TABLE patient_details (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    phone TEXT,
+                    date_of_birth TEXT,
+                    address TEXT,
+                    blood_type TEXT,
+                    emergency_contact TEXT,
+                    emergency_phone TEXT,
+                    allergies TEXT,
+                    medical_history TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE medical_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    record_date TEXT NOT NULL,
+                    record_type TEXT NOT NULL,
+                    record_data BLOB,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE appointments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     doctor_id INTEGER NOT NULL,
                     patient_id INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    appointment_date TEXT NOT NULL,
+                    appointment_time TEXT NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    notes TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (doctor_id) REFERENCES users (id),
                     FOREIGN KEY (patient_id) REFERENCES users (id)
                 )
             ''')
-            print("Doctor-Patient Relations tablosu oluşturuldu!")
-
-            # Raporlar tablosu
+            
             cursor.execute('''
                 CREATE TABLE reports (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,63 +254,31 @@ def init_db():
                     FOREIGN KEY (patient_id) REFERENCES users (id),
                     FOREIGN KEY (doctor_id) REFERENCES users (id)
                 )
-                ''')
-            print("Reports tablosu oluşturuldu!")
+            ''')
             
-            # Randevular tablosu
             cursor.execute('''
-                CREATE TABLE appointments (
+                CREATE TABLE doctor_patient_relations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    patient_id INTEGER NOT NULL,
                     doctor_id INTEGER NOT NULL,
-                    appointment_type TEXT NOT NULL,
-                    linked_embryo_id INTEGER,
-                    date_time TEXT NOT NULL,
-                    status TEXT DEFAULT 'scheduled',
-                    notes TEXT,
+                    patient_id INTEGER NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (patient_id) REFERENCES users (id),
                     FOREIGN KEY (doctor_id) REFERENCES users (id),
-                    FOREIGN KEY (linked_embryo_id) REFERENCES reports (id)
+                    FOREIGN KEY (patient_id) REFERENCES users (id)
                 )
-                ''')
-            print("Appointments tablosu oluşturuldu!")
-        
+            ''')
+            
             conn.commit()
+            print("Tüm tablolar başarıyla oluşturuldu!")
         else:
-            # Appointments tablosu var mı kontrol et, yoksa oluştur
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='appointments'")
-            if not cursor.fetchone():
-                print("Appointments tablosu oluşturuluyor...")
-                cursor.execute('''
-                    CREATE TABLE appointments (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        patient_id INTEGER NOT NULL,
-                        doctor_id INTEGER NOT NULL,
-                        appointment_type TEXT NOT NULL,
-                        linked_embryo_id INTEGER,
-                        date_time TEXT NOT NULL,
-                        status TEXT DEFAULT 'scheduled',
-                        notes TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (patient_id) REFERENCES users (id),
-                        FOREIGN KEY (doctor_id) REFERENCES users (id),
-                        FOREIGN KEY (linked_embryo_id) REFERENCES reports (id)
-                    )
-                ''')
-                conn.commit()
-                print("Appointments tablosu oluşturuldu!")
-            else:
-                print("Tüm tablolar zaten mevcut.")
-        
-        conn.close()
-        
-    except sqlite3.Error as e:
-        print(f"SQLite hatası: {str(e)}")
-        raise
+            print("Tablolar zaten mevcut. Veritabanı başlatılıyor...")
+            
+        return conn
     except Exception as e:
-        print(f"Beklenmeyen hata: {str(e)}")
+        print(f"Hata: {str(e)}")
         raise
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -220,7 +345,7 @@ def login_user():
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT id, username, password, role FROM users 
+                SELECT id, username, password, role, full_name FROM users 
                 WHERE username = ? AND role = ?
             ''', (data['username'], data['role']))
             user = cursor.fetchone()
@@ -243,7 +368,8 @@ def login_user():
                     'user': {
                         'id': user[0],
                         'username': user[1],
-                        'role': user[3]
+                        'role': user[3],
+                        'full_name': user[4]
                     }
                 }), 200
             else:
@@ -319,7 +445,7 @@ def get_user(username):
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT full_name, email, phone, address, blood_type, 
-                       emergency_contact, emergency_phone, allergies, medical_history, age 
+                       emergency_contact, emergency_phone, allergies, medical_history, age, date_of_birth
                 FROM users 
                 WHERE username = ? AND role = 'patient'
             ''', (username,))
@@ -335,7 +461,8 @@ def get_user(username):
                     'emergency_phone': result[6],
                     'allergies': result[7],
                     'medical_history': result[8],
-                    'age': result[9]
+                    'age': result[9],
+                    'date_of_birth': result[10]
                 }), 200
             return jsonify({'error': 'User not found'}), 404
     except Exception as e:
@@ -442,9 +569,9 @@ def get_doctor_patients():
                     'message': 'Geçersiz doktor ID\'si'
                 }), 404
             
-            # Önce doktorun seçtiği hastaları al
+            # Doktorun hastalarını getir
             cursor.execute('''
-                SELECT u.id, u.full_name, u.email, u.username, u.age,
+                SELECT DISTINCT u.id, u.full_name, u.email, u.username, u.age,
                        CASE WHEN dpr.doctor_id IS NOT NULL THEN 1 ELSE 0 END as is_selected
                 FROM users u
                 LEFT JOIN doctor_patient_relations dpr 
@@ -453,24 +580,6 @@ def get_doctor_patients():
             ''', (doctor_id,))
             
             patients = cursor.fetchall()
-            
-            # Eğer hiç hasta yoksa, get_patients fonksiyonunu çağır
-            if not patients:
-                print("Doktor için hasta bulunamadı, tüm hastalar getiriliyor...")
-                # get_patients fonksiyonunu çağırarak hastaları oluştur
-                get_patients()
-                
-                # Tekrar sorgula
-                cursor.execute('''
-                    SELECT u.id, u.full_name, u.email, u.username, u.age,
-                           CASE WHEN dpr.doctor_id IS NOT NULL THEN 1 ELSE 0 END as is_selected
-                    FROM users u
-                    LEFT JOIN doctor_patient_relations dpr 
-                        ON u.id = dpr.patient_id AND dpr.doctor_id = ?
-                    WHERE u.role = 'patient'
-                ''', (doctor_id,))
-                
-                patients = cursor.fetchall()
             
             return jsonify({
                 'success': True,
@@ -1233,6 +1342,239 @@ def generate_medical_record_pdf(record_id):
         return jsonify({
             'success': False,
             'message': 'PDF oluşturulurken bir hata oluştu',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/user/settings', methods=['GET'])
+def get_user_settings():
+    try:
+        user_id = request.args.get('userId')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': 'Kullanıcı ID gereklidir'
+            }), 400
+
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT settings FROM users WHERE id = ?
+            ''', (user_id,))
+            result = cursor.fetchone()
+            
+            if not result or not result[0]:
+                # Varsayılan ayarları döndür
+                return jsonify({
+                    'success': True,
+                    'settings': {
+                        'notifications': {
+                            'email': True,
+                            'sms': False,
+                            'appointments': True,
+                            'results': True,
+                            'reminders': True
+                        },
+                        'privacy': {
+                            'shareData': False,
+                            'anonymousData': True
+                        },
+                        'preferences': {
+                            'language': 'Turkish',
+                            'theme': 'light',
+                            'timeZone': 'Europe/Istanbul'
+                        }
+                    }
+                }), 200
+            
+            return jsonify({
+                'success': True,
+                'settings': result[0]
+            }), 200
+
+    except Exception as e:
+        print(f"Ayarlar getirilirken hata: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Ayarlar getirilirken bir hata oluştu',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/user/settings', methods=['PUT'])
+def update_user_settings():
+    try:
+        data = request.get_json()
+        user_id = data.get('userId')
+        settings = data.get('settings')
+        
+        if not user_id or not settings:
+            return jsonify({
+                'success': False,
+                'message': 'Kullanıcı ID ve ayarlar gereklidir'
+            }), 400
+
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET settings = ? WHERE id = ?
+            ''', (settings, user_id))
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Ayarlar başarıyla güncellendi'
+            }), 200
+
+    except Exception as e:
+        print(f"Ayarlar güncellenirken hata: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Ayarlar güncellenirken bir hata oluştu',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/user/password', methods=['PUT'])
+def update_user_password():
+    try:
+        data = request.get_json()
+        user_id = data.get('userId')
+        current_password = data.get('currentPassword')
+        new_password = data.get('newPassword')
+        
+        if not all([user_id, current_password, new_password]):
+            return jsonify({
+                'success': False,
+                'message': 'Kullanıcı ID, mevcut şifre ve yeni şifre gereklidir'
+            }), 400
+
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT password FROM users WHERE id = ?', (user_id,))
+            result = cursor.fetchone()
+            
+            if not result:
+                return jsonify({
+                    'success': False,
+                    'message': 'Kullanıcı bulunamadı'
+                }), 404
+            
+            stored_password = result[0]
+            if isinstance(stored_password, str):
+                stored_password = stored_password.encode('utf-8')
+            
+            # Mevcut şifreyi kontrol et
+            if not bcrypt.checkpw(current_password.encode('utf-8'), stored_password):
+                return jsonify({
+                    'success': False,
+                    'message': 'Mevcut şifre yanlış'
+                }), 401
+            
+            # Yeni şifreyi hashle ve güncelle
+            hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+            cursor.execute('UPDATE users SET password = ? WHERE id = ?', 
+                         (hashed_password.decode('utf-8'), user_id))
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Şifre başarıyla güncellendi'
+            }), 200
+
+    except Exception as e:
+        print(f"Şifre güncellenirken hata: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Şifre güncellenirken bir hata oluştu',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/user/delete', methods=['DELETE'])
+def delete_user():
+    try:
+        # Parametreleri al
+        name_filter = request.args.get('name')
+        user_id = request.args.get('userId')
+        
+        if not name_filter and not user_id:
+            return jsonify({
+                'success': False,
+                'message': 'Silmek için isim filtresi veya kullanıcı ID gereklidir'
+            }), 400
+            
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            
+            # İsim filtresine göre kullanıcıları bul
+            if name_filter:
+                cursor.execute("SELECT id, full_name, username, role FROM users WHERE full_name = ?", (name_filter,))
+                users = cursor.fetchall()
+                
+                if not users:
+                    return jsonify({
+                        'success': False,
+                        'message': f"'{name_filter}' isimli kullanıcı bulunamadı"
+                    }), 404
+                
+                # Bulunan kullanıcıları sil
+                deleted_users = []
+                for user in users:
+                    user_id = user[0]
+                    # İlişkili kayıtları sil
+                    cursor.execute("DELETE FROM doctor_patient_relations WHERE doctor_id = ? OR patient_id = ?", (user_id, user_id))
+                    cursor.execute("DELETE FROM reports WHERE doctor_id = ? OR patient_id = ?", (user_id, user_id))
+                    cursor.execute("DELETE FROM appointments WHERE doctor_id = ? OR patient_id = ?", (user_id, user_id))
+                    
+                    # Kullanıcıyı sil
+                    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                    deleted_users.append({
+                        'id': user[0],
+                        'full_name': user[1],
+                        'username': user[2],
+                        'role': user[3]
+                    })
+                
+                conn.commit()
+                return jsonify({
+                    'success': True,
+                    'message': f"{len(deleted_users)} kullanıcı başarıyla silindi",
+                    'deleted_users': deleted_users
+                }), 200
+            
+            # Kullanıcı ID'sine göre sil
+            else:
+                cursor.execute("SELECT id, full_name, username, role FROM users WHERE id = ?", (user_id,))
+                user = cursor.fetchone()
+                
+                if not user:
+                    return jsonify({
+                        'success': False,
+                        'message': f"ID: {user_id} olan kullanıcı bulunamadı"
+                    }), 404
+                
+                # İlişkili kayıtları sil
+                cursor.execute("DELETE FROM doctor_patient_relations WHERE doctor_id = ? OR patient_id = ?", (user_id, user_id))
+                cursor.execute("DELETE FROM reports WHERE doctor_id = ? OR patient_id = ?", (user_id, user_id))
+                cursor.execute("DELETE FROM appointments WHERE doctor_id = ? OR patient_id = ?", (user_id, user_id))
+                
+                # Kullanıcıyı sil
+                cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                
+                conn.commit()
+                return jsonify({
+                    'success': True,
+                    'message': f"Kullanıcı '{user[1]}' başarıyla silindi",
+                    'deleted_user': {
+                        'id': user[0],
+                        'full_name': user[1],
+                        'username': user[2],
+                        'role': user[3]
+                    }
+                }), 200
+    
+    except Exception as e:
+        print(f"Kullanıcı silme hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Kullanıcı silinirken bir hata oluştu',
             'error': str(e)
         }), 500
 

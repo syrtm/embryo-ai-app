@@ -89,10 +89,27 @@ function PatientDashboard() {
               doctor: report.other_party_name || 'Unknown Doctor',
               confidence: confidence,
               notes: report.notes,
-              // These would ideally come from the API, but we're using placeholder values for now
-              fragmentation: grade.includes('1') ? 4 : (grade.includes('2') ? 3 : (grade.includes('3') ? 1 : 2)),
-              symmetry: grade.includes('1') ? 4 : (grade.includes('2') ? 3 : (grade.includes('3') ? 1 : 2)),
-              generalQuality: grade.includes('1') ? 4 : (grade.includes('2') ? 3 : (grade.includes('3') ? 1 : 2))
+              // Özel sınıflar için backend'deki doğru değerleri kullan
+              fragmentation: grade === 'Morula' ? 4 : 
+                           grade === 'Early' ? 3 : 
+                           grade === 'Arrested' ? 1 : 
+                           grade.includes('1') ? 4 : 
+                           grade.includes('2') ? 3 : 
+                           grade.includes('3') ? 1 : 2,
+              
+              symmetry: grade === 'Morula' ? 4 : 
+                       grade === 'Early' ? 3 : 
+                       grade === 'Arrested' ? 1 : 
+                       grade.includes('1') ? 4 : 
+                       grade.includes('2') ? 3 : 
+                       grade.includes('3') ? 1 : 2,
+              
+              generalQuality: grade === 'Morula' ? 4 : 
+                           grade === 'Early' ? 3 : 
+                           grade === 'Arrested' ? 1 : 
+                           grade.includes('1') ? 4 : 
+                           grade.includes('2') ? 3 : 
+                           grade.includes('3') ? 1 : 2
             };
           });
           

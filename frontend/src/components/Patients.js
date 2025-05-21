@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import patientAvatars from '../utils/patientAvatars';
 
-// Tekilleştirme fonksiyonu (email VEYA username aynıysa tekilleştir)
+// Deduplication function (unique by ID)
 function uniqueBy(arr) {
   const seen = new Set();
   return arr.filter(item => {
-    const key = (item.email || '') + '|' + (item.username || '');
+    const key = item.id;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -21,14 +22,14 @@ function Patients() {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const navigate = useNavigate();
 
-  // Hastaları API'den çek
+  // Fetch patients from API
   useEffect(() => {
     fetchPatients();
   }, []);
 
   const handleSelectPatient = async (patientId, patient) => {
     try {
-      // Hasta seçimi için API çağrısı yap
+      // Make API call to select patient
       const user = JSON.parse(localStorage.getItem('user'));
       console.log('API çağrısı yapılıyor, doctor_id:', user.id, 'patient_id:', patientId);
       
@@ -57,15 +58,15 @@ function Patients() {
         };
         navigate('/doctor/analysis', { state: { patient: patientForAnalysis } });
       } else {
-        setError(data.message || 'Hasta seçilirken bir hata oluştu');
+        setError(data.message || 'An error occurred while selecting the patient');
       }
     } catch (err) {
-      console.error('Hasta seçilirken hata:', err);
-      setError('Hasta seçilirken bir hata oluştu');
+      console.error('Error selecting patient:', err);
+      setError('An error occurred while selecting the patient');
     }
   };
 
-  // fetchPatients API'den hastaları çeker, gerçek veritabanı verilerini kullanır
+  // fetchPatients retrieves patients from API, uses real database data
   const fetchPatients = async () => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));
@@ -84,13 +85,13 @@ function Patients() {
         console.log('Doktor hastaları API yanıtı:', doctorData);
         
         if (doctorData.success && Array.isArray(doctorData.patients) && doctorData.patients.length > 0) {
-          console.log('Doktor hastaları bulundu:', doctorData.patients.length);
+          console.log('Doctor patients found:', doctorData.patients.length);
           setDoctorPatients(doctorData.patients);
           setPatients(doctorData.patients);
           setLoading(false);
           return;
         } else {
-          console.log('Doktor için hasta bulunamadı veya hata oluştu, tüm hastalar getiriliyor');
+          console.log('No patients found for doctor or an error occurred, fetching all patients');
           
           // Doktor hastaları yoksa veya hata varsa, tüm hastaları çek
           try {
@@ -104,24 +105,24 @@ function Patients() {
                 ...p,
                 is_mock: false
               }));
-              console.log('Veritabanı hastaları:', dbPatients);
+              console.log('Database patients:', dbPatients);
               setPatients(dbPatients);
             } else {
-              console.log('API geçerli bir dizi dönmedi veya boş dizi döndü');
-              setError('Hasta verisi bulunamadı');
+              console.log('API did not return a valid array or returned an empty array');
+              setError('No patient data found');
             }
           } catch (apiError) {
-            console.error('Hastalar çekilirken API hatası:', apiError);
-            setError('Hastalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+            console.error('API error while fetching patients:', apiError);
+            setError('An error occurred while loading patients. Please try again later.');
           }
         }
       } catch (doctorApiError) {
-        console.error('Doktor hastaları çekilirken API hatası:', doctorApiError);
-        setError('Doktor hastaları yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        console.error('API error while fetching doctor patients:', doctorApiError);
+        setError('An error occurred while loading doctor patients. Please try again later.');
       }
     } catch (err) {
-      console.error('Genel hata:', err);
-      setError('Hastalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      console.error('General error:', err);
+      setError('An error occurred while loading patients. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -132,35 +133,25 @@ function Patients() {
     // eslint-disable-next-line
   }, [navigate]);
 
-  // Filtrelenmiş ve tekilleştirilmiş hasta listesi
+  // Filtered and deduplicated patient list
   console.log('Filtreleme öncesi hastalar:', patients);
   
-  const filteredPatients = uniqueBy(
-    patients
-      .filter(p => {
-        // Null/undefined kontrolleri ekleyelim
-        const fullName = p.full_name || p.name || '';
-        const email = p.email || '';
-        const username = p.username || '';
-        
-        const nameMatch = fullName.toLowerCase().includes(search.toLowerCase());
-        const emailMatch = email.toLowerCase().includes(search.toLowerCase());
-        const isDemoUser = username && username.startsWith('demo');
-        
-        const shouldInclude = (search === '' || nameMatch || emailMatch) && !isDemoUser;
-        
-        console.log(`Hasta ${fullName} (${email}): nameMatch=${nameMatch}, emailMatch=${emailMatch}, isDemoUser=${isDemoUser}, shouldInclude=${shouldInclude}`);
-        
-        return shouldInclude;
-      })
-  );
+  const filteredPatients = uniqueBy(patients)
+    .filter(p => {
+      const fullName = p.full_name || p.name || '';
+      const email = p.email || '';
+      const searchLower = search.toLowerCase();
+      const nameMatch = fullName.toLowerCase().includes(searchLower);
+      const emailMatch = email.toLowerCase().includes(searchLower);
+      return search === '' || nameMatch || emailMatch;
+    });
   
   console.log('Filtreleme sonrası hastalar:', filteredPatients);
 
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4">
-        <div className="text-center">Yükleniyor...</div>
+        <div className="text-center">Loading...</div>
       </div>
     );
   }
@@ -175,7 +166,7 @@ function Patients() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold mb-6">Hastalarım</h1>
+      <h1 className="text-2xl font-bold mb-6">My Patients</h1>
       <input
         type="text"
         placeholder="İsim veya email ile ara..."
@@ -186,18 +177,28 @@ function Patients() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredPatients.map(patient => (
           <div key={patient.id} className="bg-white rounded-xl shadow p-5 flex items-center space-x-4 border border-gray-100">
-            <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center">
-              <span className="text-2xl text-teal-600">
-                {(patient.full_name || patient.name || '?').charAt(0)}
-              </span>
+            <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center">
+              {patientAvatars[patient.full_name || patient.name] ? (
+                <img 
+                  src={patientAvatars[patient.full_name || patient.name]} 
+                  alt={patient.full_name || patient.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-teal-100 flex items-center justify-center">
+                  <span className="text-2xl text-teal-600">
+                    {(patient.full_name || patient.name || '?').charAt(0)}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex-grow">
-              <h2 className="text-lg font-semibold">{patient.full_name || patient.name || 'İsimsiz Hasta'}</h2>
-              <p className="text-sm text-gray-500">{patient.email || 'E-posta yok'}</p>
-              <p className="text-sm text-gray-500">@{patient.username || 'kullanıcı-adı-yok'}</p>
+              <h2 className="text-lg font-semibold">{patient.full_name || patient.name || 'Unnamed Patient'}</h2>
+              <p className="text-sm text-gray-500">{patient.email || 'No email'}</p>
+              <p className="text-sm text-gray-500">@{patient.username || 'no-username'}</p>
               {patient.is_mock && (
                 <span className="inline-block px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-full mt-1">
-                  Demo Hasta
+                  Demo Patient
                 </span>
               )}
             </div>
@@ -209,13 +210,13 @@ function Patients() {
                   : 'bg-teal-500 text-white hover:bg-teal-600'
               }`}
             >
-              Hasta Seç
+              Select Patient
             </button>
           </div>
         ))}
         {filteredPatients.length === 0 && (
           <div className="col-span-2 text-center text-gray-400 py-10">
-            {search ? 'Arama sonucu bulunamadı.' : 'Henüz hasta bulunmuyor.'}
+            {search ? 'No results found.' : 'No patients found yet.'}
           </div>
         )}
       </div>

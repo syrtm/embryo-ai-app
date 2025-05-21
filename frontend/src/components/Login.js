@@ -28,7 +28,7 @@ function Login({ onLogin }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Giriş başarısız oldu');
+        throw new Error(data.message || 'Login failed');
       }
 
       if (data.success) {
@@ -36,11 +36,11 @@ function Login({ onLogin }) {
         onLogin({ ...credentials, role: data.user.role });
         navigate(data.user.role === 'doctor' ? '/doctor' : '/patient');
       } else {
-        setError(data.message || 'Giriş başarısız oldu');
+        setError(data.message || 'Login failed');
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError(err.message || 'Giriş sırasında bir hata oluştu');
+      setError(err.message || 'An error occurred during login');
     }
   };
 

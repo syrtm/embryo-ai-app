@@ -219,38 +219,14 @@ function EmbryoReport({ isDarkMode }) {
       </div>
 
       {/* Report Content */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Column - Image */}
-        <div className={`rounded-xl shadow-sm overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
-          <div className="p-6">
-            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              Embryo Image
-            </h2>
-            <div className="rounded-lg overflow-hidden border border-gray-200">
-              {report.image_path ? (
-                <img 
-                  src={`http://localhost:5000/uploads/${report.image_path}`} 
-                  alt="Embryo" 
-                  className="w-full h-auto object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = 'https://via.placeholder.com/400x300?text=Embryo+Image+Not+Available';
-                  }}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg">
-                  <p className="text-gray-500 text-center">Embryo image not available</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      <div className="mt-6">
+        {/* Analysis Details - Full Width */}
 
-        {/* Right Column - Analysis Details */}
+        {/* Analysis Details - Full Width */}
         <div className={`rounded-xl shadow-sm overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
           <div className="p-6">
             <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              Analysis Details
+              Embryo Analysis Details
             </h2>
             
             <div className="space-y-4">

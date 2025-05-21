@@ -10,7 +10,7 @@ function SignUp() {
     username: '',
     password: '',
     confirmPassword: '',
-    role: 'patient'  // Varsayılan rol
+    role: 'patient'  // Default role
   });
   const [error, setError] = useState('');
   const [agreeToTerms, setAgreeToTerms] = useState(false);
@@ -20,12 +20,12 @@ function SignUp() {
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Şifreler eşleşmiyor');
+      setError('Passwords do not match');
       return;
     }
 
     if (!agreeToTerms) {
-      setError('Devam etmek için şartları kabul etmelisiniz');
+      setError('You must accept the terms to continue');
       return;
     }
 
@@ -47,7 +47,7 @@ function SignUp() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Kayıt işlemi başarısız oldu');
+        throw new Error(data.message || 'Registration failed');
       }
 
       if (data.success) {

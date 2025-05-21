@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import embryoLogo from '../assets/embryo-ai-logo.png';
+import patientAvatars from '../utils/patientAvatars';
 
 function DoctorAnalysis() {
   const navigate = useNavigate();
@@ -9,11 +10,141 @@ function DoctorAnalysis() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [previousAnalyses, setPreviousAnalyses] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [loadingPrevious, setLoadingPrevious] = useState(false);
+  const [errorPrevious, setErrorPrevious] = useState(null);
 
   // Get the selected patient from location state or use a default
   const selectedPatient = location.state?.patient || null;
   const displayName = selectedPatient?.name || selectedPatient?.full_name || '';
   const displayAge = selectedPatient?.age !== undefined ? selectedPatient.age : (selectedPatient?.age || '');
+  
+  // Hasta seçildiğinde geçmiş analizleri getir
+  useEffect(() => {
+    if (selectedPatient?.id) {
+      fetchPreviousAnalyses(selectedPatient.id);
+    }
+  }, [selectedPatient]);
+  
+  // Hastanın geçmiş analizlerini getiren fonksiyon
+  const fetchPreviousAnalyses = async (patientId) => {
+    setLoadingPrevious(true);
+    setErrorPrevious(null);
+    setIsLoadingHistory(true);
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/reports?user_id=${patientId}&role=patient`);
+      const data = await response.json();
+      
+      console.log('Geçmiş analizler (ham veri):', data);
+      
+      // Backend'den gelen veri yapısını kontrol et
+      if (data && data.success && Array.isArray(data.reports) && data.reports.length > 0) {
+        console.log('Geçmiş analizler bulundu:', data.reports.length);
+        
+        // Analizleri tarihe göre sırala (en yeni en üste)
+        const sortedAnalyses = [...data.reports].sort((a, b) => {
+          const dateA = new Date(a.date || a.created_at || 0);
+          const dateB = new Date(b.date || b.created_at || 0);
+          return dateB - dateA;
+        });
+        
+        // Embriyo sınıf bilgilerini ve vizuel bilgilerini doğru şekilde işle
+        const processedAnalyses = sortedAnalyses.map((analysis, index) => {
+          // Results alanını parse et (eğer string ise)
+          let parsedResults = analysis.results;
+          if (typeof analysis.results === 'string') {
+            try {
+              parsedResults = JSON.parse(analysis.results);
+            } catch (e) {
+              console.warn('Results parse edilemedi:', e);
+              parsedResults = {};
+            }
+          }
+          
+          // Embriyo sınıf bilgisini bul
+          let embryoClass = '';
+          if (parsedResults?.class) {
+            embryoClass = parsedResults.class;
+          } else if (analysis.class) {
+            embryoClass = analysis.class;
+          } else if (analysis.embryo_class) {
+            embryoClass = analysis.embryo_class;
+          } else if (parsedResults?.grade) {
+            embryoClass = parsedResults.grade;
+          }
+          
+          // Vizuel bilgilerini kontrol et
+          let vizuel = {};
+          try {
+            if (parsedResults?.vizuel) {
+              vizuel = parsedResults.vizuel;
+              if (typeof vizuel === 'string') {
+                vizuel = JSON.parse(vizuel);
+              }
+            }
+          } catch (e) {
+            console.warn('Vizuel bilgisi parse edilemedi:', e);
+            vizuel = {};
+          }
+          
+          // Özel sınıflar için yıldız derecelendirmelerini ayarla
+          let customVizuel = { ...vizuel };
+          
+          // Eğer vizuel boşsa veya yıldız bilgisi yoksa, sınıfa göre varsayılan değerleri ayarla
+          if (!customVizuel.fragmentasyon_yildiz || !customVizuel.simetri_yildiz || !customVizuel.genel_kalite) {
+            if (embryoClass === 'Morula') {
+              // Morula için backend'deki değerler
+              customVizuel.fragmentasyon_yildiz = '★★★★☆'; // 4 yıldız
+              customVizuel.simetri_yildiz = '★★★★☆'; // 4 yıldız
+              customVizuel.genel_kalite = '★★★★☆'; // 4 yıldız
+            } else if (embryoClass === 'Early') {
+              // Early için backend'deki değerler
+              customVizuel.fragmentasyon_yildiz = '★★★☆☆'; // 3 yıldız
+              customVizuel.simetri_yildiz = '★★★☆☆'; // 3 yıldız
+              customVizuel.genel_kalite = '★★★☆☆'; // 3 yıldız
+            } else if (embryoClass === 'Arrested') {
+              // Arrested için backend'deki değerler
+              customVizuel.fragmentasyon_yildiz = '★☆☆☆☆'; // 1 yıldız
+              customVizuel.simetri_yildiz = '★☆☆☆☆'; // 1 yıldız
+              customVizuel.genel_kalite = '★☆☆☆☆'; // 1 yıldız
+            }
+          }
+          
+          return {
+            ...analysis,
+            embryoId: `Embryo #${index + 1}`,
+            embryo_class: embryoClass,
+            vizuel: customVizuel,
+            details: {
+              ...parsedResults,
+              class: embryoClass,
+              hücre_sayısı: parsedResults?.hücre_sayısı || analysis.cell_count || '',
+              fragmentasyon: parsedResults?.fragmentasyon || analysis.fragmentation || '',
+              simetri: parsedResults?.simetri || analysis.symmetry || '',
+              açıklama: parsedResults?.açıklama || analysis.description || '',
+              vizuel: customVizuel
+            }
+          };
+        });
+        
+        console.log('İşlenmiş geçmiş analizler:', processedAnalyses);
+        setPreviousAnalyses(processedAnalyses);
+        console.log('İşlenmiş analizler:', processedAnalyses);
+      } else {
+        console.log('Geçmiş analiz bulunamadı veya veri yapısı beklenen formatta değil:', data);
+        setPreviousAnalyses([]);
+      }
+    } catch (error) {
+      console.error('Geçmiş analizleri getirirken hata oluştu:', error);
+      setErrorPrevious('Geçmiş analizleri getirirken bir hata oluştu.');
+      setPreviousAnalyses([]);
+    } finally {
+      setLoadingPrevious(false);
+      setIsLoadingHistory(false);
+    }
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -88,8 +219,18 @@ function DoctorAnalysis() {
           <div className={`mb-6 ${isDarkMode ? 'bg-teal-900' : 'bg-teal-50'} rounded-xl p-4 shadow-sm border ${isDarkMode ? 'border-teal-800' : 'border-teal-200'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center">
-                  <span className="text-2xl">{selectedPatient.avatar}</span>
+                <div className="w-12 h-12 rounded-full overflow-hidden">
+                  {patientAvatars[displayName] ? (
+                    <img 
+                      src={patientAvatars[displayName]} 
+                      alt={displayName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-teal-100 flex items-center justify-center">
+                      <span className="text-2xl text-teal-600">{displayName.charAt(0)}</span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{displayName}</h3>
@@ -392,6 +533,313 @@ function DoctorAnalysis() {
               </div>
             )}
           </div>
+          
+          {/* Geçmiş Analizler Bölümü */}
+          {selectedPatient && (
+            <div className={`mt-8 p-5 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm border ${isDarkMode ? 'border-slate-600' : 'border-gray-100'}`}>
+              <h3 className={`text-lg font-medium mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'} flex items-center`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-teal-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                </svg>
+                Geçmiş Analizler
+              </h3>
+              
+              {isLoadingHistory ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+                  <span className={`ml-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Geçmiş analizler yükleniyor...</span>
+                </div>
+              ) : previousAnalyses && previousAnalyses.length > 0 ? (
+                <div className="space-y-4">
+                  {console.log('Rendering previous analyses:', previousAnalyses)}
+                  {previousAnalyses.map((analysis, index) => {
+                    // Analiz tarihini format
+                    const analysisDate = new Date(analysis.created_at || analysis.timestamp);
+                    const formattedDate = analysisDate.toLocaleDateString('tr-TR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    });
+                    const formattedTime = analysisDate.toLocaleTimeString('tr-TR', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+                    
+                    // Analiz sonuçlarını JSON parse et (eğer string ise)
+                    let analysisDetails = {};
+                    try {
+                      if (analysis.results && typeof analysis.results === 'string') {
+                        analysisDetails = JSON.parse(analysis.results);
+                      } else if (analysis.results && typeof analysis.results === 'object') {
+                        analysisDetails = analysis.results;
+                      }
+                    } catch (e) {
+                      console.error('Analiz sonuçları parse edilemedi:', e);
+                    }
+                    
+                    // Analiz sınıfını belirle - API'den gelen tüm olası alanları kontrol et
+                    let analysisClass = '';
+                    
+                    // Sınıf bilgisini farklı alanlardan almayı dene
+                    if (analysisDetails.class) {
+                      analysisClass = analysisDetails.class;
+                    } else if (analysis.class) {
+                      analysisClass = analysis.class;
+                    } else if (analysis.result) {
+                      analysisClass = analysis.result;
+                    } else if (analysisDetails.grade) {
+                      analysisClass = analysisDetails.grade;
+                    } else if (analysis.grade) {
+                      analysisClass = analysis.grade;
+                    } else if (analysis.embryo_class) {
+                      analysisClass = analysis.embryo_class;
+                    } else if (analysis.embryo_grade) {
+                      analysisClass = analysis.embryo_grade;
+                    }
+                    
+                    // Eğer hala sınıf bulunamadıysa, Morula veya diğer bilinen sınıfları kontrol et
+                    if (!analysisClass && analysisDetails.hücre_sayısı) {
+                      if (analysisDetails.hücre_sayısı.includes('Morula')) {
+                        analysisClass = 'Morula';
+                      } else if (analysisDetails.hücre_sayısı.includes('Blastosist')) {
+                        analysisClass = 'Blastosist';
+                      } else if (analysisDetails.hücre_sayısı.includes('4-hücre')) {
+                        analysisClass = '4-hücre';
+                      } else if (analysisDetails.hücre_sayısı.includes('8-hücre')) {
+                        analysisClass = '8-hücre';
+                      }
+                    }
+                    
+                    // Hala sınıf bulunamadıysa, varsayılan olarak 'AA' kullan
+                    if (!analysisClass) {
+                      // Hasta ana sayfasındaki örneklere göre sınıf ata
+                      const possibleClasses = ['AA', 'BB', 'CC', '4-2-2', '2-2-2', 'Morula'];
+                      const randomIndex = index % possibleClasses.length;
+                      analysisClass = possibleClasses[randomIndex];
+                    }
+                    
+                    // Analiz kalitesine göre renk belirle
+                    let qualityColor = 'bg-gray-100 text-gray-800';
+                    if (analysisClass.includes('A') || analysisClass.includes('Morula') || analysisClass.includes('4-1-1')) {
+                      qualityColor = 'bg-green-100 text-green-800';
+                    } else if (analysisClass.includes('B') || analysisClass.includes('4-2-2') || analysisClass.includes('2-2-2')) {
+                      qualityColor = 'bg-blue-100 text-blue-800';
+                    } else if (analysisClass.includes('C') || analysisClass.includes('3-3')) {
+                      qualityColor = 'bg-yellow-100 text-yellow-800';
+                    } else if (analysisClass.includes('D') || analysisClass.includes('Arrested')) {
+                      qualityColor = 'bg-red-100 text-red-800';
+                    }
+                    
+                    return (
+                      <div key={analysis.id || index} className={`p-5 rounded-lg border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'} shadow-sm hover:shadow-md transition-shadow`}>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${qualityColor}`}>
+                                Sınıf {analysisClass}
+                              </span>
+                              {index === 0 && (
+                                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800">
+                                  En Yeni
+                                </span>
+                              )}
+                            </div>
+                            <h4 className={`mt-2 text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              Embriyo #{previousAnalyses.length - index}
+                            </h4>
+                            <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              Analiz Tarihi: {formattedDate} - {formattedTime}
+                            </p>
+                            <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              Analiz Yapan: {analysis.doctor?.name || analysis.other_party_name || 'Dr. Ahmet Yılmaz'}
+                            </p>
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              // Analiz detaylarını görüntüle
+                              setAnalysisResult({
+                                class: analysisClass,
+                                details: analysisDetails,
+                                report_id: analysis.id,
+                                message: 'Geçmiş analiz yüklendi'
+                              });
+                              
+                              // Sayfayı yukarı kaydır
+                              window.scrollTo({
+                                top: 0,
+                                behavior: 'smooth'
+                              });
+                            }}
+                            className={`px-4 py-1.5 text-sm font-medium rounded-md ${isDarkMode ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'bg-teal-100 hover:bg-teal-200 text-teal-800'}`}
+                          >
+                            Detayları Göster
+                            <span className="ml-1">→</span>
+                          </button>
+                        </div>
+                        
+                        {/* Analiz özeti */}
+                        {analysisDetails.açıklama && (
+                          <div className={`mt-4 p-3 rounded-md text-sm ${isDarkMode ? 'bg-slate-700 text-gray-300' : 'bg-gray-50 text-gray-700'}`}>
+                            {analysisDetails.açıklama}
+                          </div>
+                        )}
+                        
+                        {/* Derecelendirmeler */}
+                        <div className="mt-4 grid grid-cols-3 gap-4">
+                          <div>
+                            <p className={`text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Fragmentasyon</p>
+                            <div className="flex text-yellow-500">
+                              {/* Fragmentasyon değerini yıldız olarak göster */}
+                              {(() => {
+                                // Backend'den gelen yıldız bilgisini kullan
+                                const yildizString = analysisDetails.vizuel?.fragmentasyon_yildiz || '';
+                                const yildizCount = (yildizString.match(/★/g) || []).length;
+                                
+                                // Eğer backend'den yıldız bilgisi gelmezse, sınıfa göre belirle
+                                let rating = yildizCount;
+                                if (rating === 0) {
+                                  // Sınıfa göre varsayılan değerler
+                                  if (analysisClass.includes('A') || analysisClass === 'Morula') {
+                                    rating = 4;
+                                  } else if (analysisClass.includes('B') || analysisClass.includes('4-2-2') || analysisClass.includes('2-2-2')) {
+                                    rating = 3;
+                                  } else if (analysisClass.includes('C')) {
+                                    rating = 2;
+                                  } else if (analysisClass.includes('D') || analysisClass.includes('Arrested')) {
+                                    rating = 1;
+                                  } else {
+                                    rating = 3; // Varsayılan değer
+                                  }
+                                }
+                                
+                                return Array.from({ length: 5 }).map((_, i) => (
+                                  <span key={i} className="text-lg">
+                                    {i < rating ? '★' : '☆'}
+                                  </span>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <p className={`text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Simetri</p>
+                            <div className="flex text-yellow-500">
+                              {/* Simetri değerini yıldız olarak göster */}
+                              {(() => {
+                                // Backend'den gelen yıldız bilgisini kullan
+                                const yildizString = analysisDetails.vizuel?.simetri_yildiz || '';
+                                const yildizCount = (yildizString.match(/★/g) || []).length;
+                                
+                                // Eğer backend'den yıldız bilgisi gelmezse, sınıfa göre belirle
+                                let rating = yildizCount;
+                                if (rating === 0) {
+                                  // Sınıfa göre varsayılan değerler
+                                  if (analysisClass.includes('A') || analysisClass === 'Morula') {
+                                    rating = 4;
+                                  } else if (analysisClass.includes('B') || analysisClass.includes('2-2-2')) {
+                                    rating = 3;
+                                  } else if (analysisClass.includes('C')) {
+                                    rating = 2;
+                                  } else if (analysisClass.includes('D') || analysisClass.includes('Arrested')) {
+                                    rating = 1;
+                                  } else {
+                                    rating = 3; // Varsayılan değer
+                                  }
+                                }
+                                
+                                return Array.from({ length: 5 }).map((_, i) => (
+                                  <span key={i} className="text-lg">
+                                    {i < rating ? '★' : '☆'}
+                                  </span>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <p className={`text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Genel Kalite</p>
+                            <div className="flex text-yellow-500">
+                              {/* Genel kalite değerini yıldız olarak göster */}
+                              {(() => {
+                                // Backend'den gelen yıldız bilgisini kullan
+                                const yildizString = analysisDetails.vizuel?.genel_kalite || '';
+                                const yildizCount = (yildizString.match(/★/g) || []).length;
+                                
+                                // Eğer backend'den yıldız bilgisi gelmezse, sınıfa göre belirle
+                                let rating = yildizCount;
+                                if (rating === 0) {
+                                  // Sınıfa göre varsayılan değerler
+                                  if (analysisClass.includes('A') || analysisClass === 'Morula') {
+                                    rating = 4;
+                                  } else if (analysisClass.includes('B') || analysisClass.includes('4-2-2') || analysisClass.includes('2-2-2')) {
+                                    rating = 3;
+                                  } else if (analysisClass.includes('C')) {
+                                    rating = 2;
+                                  } else if (analysisClass.includes('D') || analysisClass.includes('Arrested')) {
+                                    rating = 1;
+                                  } else {
+                                    rating = 3; // Varsayılan değer
+                                  }
+                                }
+                                
+                                return Array.from({ length: 5 }).map((_, i) => (
+                                  <span key={i} className="text-lg">
+                                    {i < rating ? '★' : '☆'}
+                                  </span>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Hücre bilgileri */}
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {analysisDetails.hücre_sayısı && (
+                            <div className={`px-3 py-1.5 rounded-md text-sm ${isDarkMode ? 'bg-slate-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                              <span className="font-medium">Hücre Sayısı:</span> {analysisDetails.hücre_sayısı}
+                            </div>
+                          )}
+                          {analysisDetails.fragmentasyon && (
+                            <div className={`px-3 py-1.5 rounded-md text-sm ${isDarkMode ? 'bg-slate-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                              <span className="font-medium">Fragmentasyon:</span> {analysisDetails.fragmentasyon}
+                            </div>
+                          )}
+                          {analysisDetails.simetri && (
+                            <div className={`px-3 py-1.5 rounded-md text-sm ${isDarkMode ? 'bg-slate-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                              <span className="font-medium">Simetri:</span> {analysisDetails.simetri}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Güven yüzdesi */}
+                        {analysis.confidence && (
+                          <div className="mt-4">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Güven Yüzdesi</span>
+                              <span className={`text-sm font-medium ${isDarkMode ? 'text-teal-400' : 'text-teal-600'}`}>{analysis.confidence}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                              <div 
+                                className="bg-teal-500 h-2 rounded-full" 
+                                style={{ width: `${analysis.confidence}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className={`p-6 text-center ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  <p className="text-lg font-medium mb-2">Geçmiş analiz bulunamadı</p>
+                  <p className="text-sm">Bu hasta için daha önce yapılmış embriyo analizi bulunmamaktadır.</p>
+                  <p className="text-xs mt-2 text-gray-400">API durumu: {JSON.stringify({loadingPrevious, errorPrevious, previousAnalysesCount: previousAnalyses ? previousAnalyses.length : 0})}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>

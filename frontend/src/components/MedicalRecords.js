@@ -176,7 +176,7 @@ function MedicalRecords() {
       // Get the user from localStorage
       const user = JSON.parse(localStorage.getItem('user'));
       if (!user || !user.id) {
-        throw new Error('Kullanıcı kimliği doğrulanamadı');
+        throw new Error('User identity could not be verified');
       }
       
       // Create the URL for the PDF download endpoint
@@ -191,7 +191,7 @@ function MedicalRecords() {
       }
       
       // Fetch the PDF
-      console.log('PDF indirme URL:', downloadUrl);
+      console.log('PDF download URL:', downloadUrl);
       const response = await fetch(downloadUrl);
       
       if (!response.ok) {
@@ -200,9 +200,9 @@ function MedicalRecords() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorData.error || errorMessage;
-          console.error('Sunucu hatası:', errorData);
+          console.error('Server error:', errorData);
         } catch (e) {
-          console.error('Hata detayları alınamadı:', e);
+          console.error('Failed to get error details:', e);
         }
         throw new Error(errorMessage);
       }
@@ -234,8 +234,8 @@ function MedicalRecords() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(link);
     } catch (error) {
-      console.error('PDF indirme hatası:', error);
-      alert(error.message || 'PDF indirme sırasında bir hata oluştu');
+      console.error('PDF download error:', error);
+      alert(error.message || 'An error occurred while downloading the PDF');
     } finally {
       setDownloadingPdf(false);
     }
@@ -327,7 +327,7 @@ function MedicalRecords() {
                       <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      PDF İndir
+                      Download PDF
                     </button>
                   </div>
                 </div>

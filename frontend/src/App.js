@@ -20,8 +20,12 @@ import EmbryoReport from './components/EmbryoReport';
 import { NotificationProvider } from './context/NotificationContext';
 
 function PatientRoutes({ onLogout }) {
+  // Get user name from localStorage
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userName = user.full_name || 'Patient';
+  
   return (
-    <DashboardLayout userRole="patient" onLogout={onLogout}>
+    <DashboardLayout userRole="patient" userName={userName} onLogout={onLogout}>
       <Routes>
         <Route path="/" element={<PatientDashboard />} />
         <Route path="/profile" element={<PatientProfile />} />
@@ -37,8 +41,12 @@ function PatientRoutes({ onLogout }) {
 }
 
 function DoctorRoutes({ onLogout }) {
+  // Get user name from localStorage
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userName = user.full_name || 'Doctor';
+  
   return (
-    <DashboardLayout userRole="doctor" onLogout={onLogout}>
+    <DashboardLayout userRole="doctor" userName={userName} onLogout={onLogout}>
       <Routes>
         <Route path="/" element={<DoctorDashboard />} />
         <Route path="/messages" element={<Messages />} />

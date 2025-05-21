@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import embryoLogo from '../assets/embryo-ai-logo.png';
+import patientAvatars from '../utils/patientAvatars';
 
 function DoctorDashboard() {
   /* ------------------------------------------------------------------
@@ -58,12 +59,46 @@ function DoctorDashboard() {
     }
   ];
 
-  const patients = [
-    { id: 1, name: 'Emma Thompson', age: 34, status: 'Waiting for Upload', avatar: '👩🏼', photo: 'https://randomuser.me/api/portraits/women/44.jpg' },
-    { id: 2, name: 'Sarah Johnson', age: 29, status: 'Analysis Complete', avatar: '👩🏻', photo: 'https://randomuser.me/api/portraits/women/65.jpg' },
-    { id: 3, name: 'Lisa Davis', age: 31, status: 'Waiting for Upload', avatar: '👩🏽', photo: 'https://randomuser.me/api/portraits/women/63.jpg' },
-    { id: 4, name: 'Emily Brown', age: 36, status: 'Analysis Complete', avatar: '👩🏼', photo: 'https://randomuser.me/api/portraits/women/68.jpg' }
-  ];
+  const [patients, setPatients] = useState([]);
+
+  useEffect(() => {
+    fetchPatients();
+  }, []);
+
+  const fetchPatients = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user) {
+        console.error('Kullanıcı bilgisi bulunamadı');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`http://localhost:5000/api/doctor/patients?doctor_id=${user.id}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        // Duplicate patients'i kaldırmak için uniqueBy fonksiyonunu kullan
+        const uniquePatients = data.patients.filter((patient, index, self) => 
+          index === self.findIndex(p => p.id === patient.id)
+        ).map(patient => ({
+          id: patient.id,
+          name: patient.full_name,
+          age: patient.age,
+          status: patient.is_selected ? 'Analysis Complete' : 'Waiting for Upload',
+          initials: patient.full_name.split(' ')[0][0] + (patient.full_name.split(' ')[1]?.[0] || '')
+        }));
+        
+        setPatients(uniquePatients);
+      } else {
+        console.error('Backend hatası:', data.message);
+        setPatients([]);
+      }
+    } catch (error) {
+      console.error('Hasta listesi yüklenirken hata:', error);
+      setPatients([]);
+    }
+  };
 
   const notifications = [
     { title: 'New Appointment Request', icon: '📅', time: '5m', color: 'bg-blue-100 text-blue-800' },
@@ -114,7 +149,7 @@ function DoctorDashboard() {
         throw new Error('User not authenticated');
       }
       
-      const response = await fetch(`http://localhost:5000/api/appointments?user_id=${user.id}&role=doctor`);
+      const response = await fetch(`http://localhost:5000/api/appointments?userId=${user.id}&role=doctor`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch appointments');
@@ -325,8 +360,20 @@ function DoctorDashboard() {
                       }`}
                     >
                       <div className="flex items-center space-x-4">
-                        <div className={`relative flex-shrink-0 w-12 h-12 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} flex items-center justify-center shadow-sm overflow-hidden`}>
-                          <img src={p.photo} alt="Patient" className="w-full h-full object-cover" />
+                        <div className={`relative flex-shrink-0 w-12 h-12 rounded-full overflow-hidden shadow-sm`}>
+                          {patientAvatars[p.name] ? (
+                            <img 
+                              src={patientAvatars[p.name]} 
+                              alt={p.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className={`w-full h-full ${isDarkMode ? 'bg-purple-900' : 'bg-purple-100'} flex items-center justify-center`}>
+                              <span className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-purple-800'}`}>
+                                {p.initials.toUpperCase()}
+                              </span>
+                            </div>
+                          )}
                           {selected && (
                             <div className="absolute -top-1 -right-1 bg-teal-500 rounded-full w-5 h-5 flex items-center justify-center border-2 border-white z-10">
                               <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
@@ -471,8 +518,20 @@ function DoctorDashboard() {
                     >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-12 w-12 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 flex items-center justify-center text-white text-xl">
-                            👤
+                          <div className="flex-shrink-0 h-12 w-12 rounded-full overflow-hidden">
+                            {patientAvatars[appointment.other_party_name] ? (
+                              <img 
+                                src={patientAvatars[appointment.other_party_name]} 
+                                alt={appointment.other_party_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className={`w-full h-full ${isDarkMode ? 'bg-gradient-to-r from-teal-500 to-cyan-400' : 'bg-gradient-to-r from-teal-500 to-cyan-400'} flex items-center justify-center text-white`}>
+                                <span className="text-xl">
+                                  {appointment.other_party_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                </span>
+                              </div>
+                            )}
                           </div>
                           <div className="ml-4">
                             <h3 className={`text-base font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -618,15 +677,35 @@ function DoctorDashboard() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-rose-500 rounded-full"></div>
+                      {patientAvatars['Emma Thompson'] ? (
+                        <img 
+                          src={patientAvatars['Emma Thompson']} 
+                          alt="Emma Thompson"
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-rose-100 flex items-center justify-center">
+                          <span className="text-xs font-bold text-rose-800">ET</span>
+                        </div>
+                      )}
                       <span className="text-sm">Emma Thompson</span>
                     </div>
                     <span className="text-xs text-gray-500">Today, 2:00 PM</span>
                   </div>
                   <div className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-sm">Michael Brown</span>
+                      {patientAvatars['Emma Jhonson'] ? (
+                        <img 
+                          src={patientAvatars['Emma Jhonson']} 
+                          alt="Emma Jhonson"
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                          <span className="text-xs font-bold text-blue-800">EJ</span>
+                        </div>
+                      )}
+                      <span className="text-sm">Emma Jhonson</span>
                     </div>
                     <span className="text-xs text-gray-500">Tomorrow, 10:30 AM</span>
                   </div>

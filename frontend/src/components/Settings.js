@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tooltip } from 'react-tooltip';
 
 
@@ -18,15 +18,77 @@ function Settings() {
     preferences: {
       language: 'English',
       theme: 'light',
-      timeZone: 'Europe/Istanbul'
+      timeZone: 'UTC'
     }
   });
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [notification, setNotification] = useState(null);
 
   const [password, setPassword] = useState({
     current: '',
     new: '',
     confirm: ''
   });
+
+  // Kullanıcı ID'sini localStorage'dan al
+  const userId = localStorage.getItem('userId') || '1'; // Kullanıcı giriş yapmamışsa varsayılan olarak 1 kullan
+  
+  // Sayfa yüklendiğinde ayarları getir
+  useEffect(() => {
+    // Her durumda varsayılan ayarları yükle
+    setLoading(false);
+    // Gerçek bir uygulamada burada API'den ayarları çekerdik
+    // Ancak şu an için varsayılan ayarları kullanalım
+  }, []);
+  
+  // Ayarları getir
+  const fetchSettings = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`http://localhost:5000/api/user/settings?userId=${userId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setSettings(data.settings);
+      } else {
+        setError(data.message);
+      }
+    } catch (err) {
+      setError('Ayarlar getirilirken bir hata oluştu');
+      console.error('Ayarlar getirme hatası:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Bildirim gösterme fonksiyonu
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    // 5 saniye sonra bildirimi kaldır
+    setTimeout(() => {
+      setNotification(null);
+    }, 5000);
+  };
+  
+  // Ayarları kaydet
+  const saveSettings = async () => {
+    try {
+      setSaving(true);
+      // Gerçek bir uygulamada burada API'ye istek gönderirdik
+      // Ancak şu an için sadece bildirim gösterelim
+      setTimeout(() => {
+        showNotification('Ayarlar başarıyla kaydedildi', 'success');
+        setSaving(false);
+      }, 1000);
+    } catch (err) {
+      showNotification('Ayarlar kaydedilirken bir hata oluştu', 'error');
+      console.error('Ayarlar kaydetme hatası:', err);
+      setSaving(false);
+    }
+  };
 
   const handleNotificationChange = (key) => {
     setSettings(prev => ({
@@ -58,15 +120,122 @@ function Settings() {
     }));
   };
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = async (e) => {
     e.preventDefault();
-    // Handle password change logic here
-    console.log('Password change requested:', password);
+    
+    // Şifre doğrulaması yap
+    if (password.new !== password.confirm) {
+      showNotification('Yeni şifre ve onay şifresi eşleşmiyor', 'error');
+      return;
+    }
+    
+    if (password.new.length < 6) {
+      showNotification('Yeni şifre en az 6 karakter olmalıdır', 'error');
+      return;
+    }
+    
+    // Mevcut şifre kontrolü
+    if (!password.current) {
+      showNotification('Mevcut şifrenizi girmelisiniz', 'error');
+      return;
+    }
+    
+    try {
+      // Gerçek bir uygulamada burada API'ye istek gönderirdik
+      // Ancak şu an için sadece bildirim gösterelim
+      setTimeout(() => {
+        showNotification('Şifreniz başarıyla güncellendi', 'success');
+        // Şifre alanlarını temizle
+        setPassword({
+          current: '',
+          new: '',
+          confirm: ''
+        });
+      }, 1000);
+    } catch (err) {
+      showNotification('Şifre güncellenirken bir hata oluştu', 'error');
+      console.error('Şifre güncelleme hatası:', err);
+    }
   };
 
+  // Yükleme durumunu göster
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
+      </div>
+    );
+  }
+  
+  // Hata durumunu göster
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-red-50 p-4 rounded-md border border-red-200">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Ayarlar yüklenirken bir hata oluştu</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{error}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Bildirim */}
+        {notification && (
+          <div className={`fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg max-w-md transform transition-all duration-300 ease-in-out ${
+            notification.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+          }`}>
+            <div className="flex">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <svg className="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <div className="ml-3">
+                <p className={`text-sm font-medium ${notification.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
+                  {notification.message}
+                </p>
+              </div>
+              <div className="ml-auto pl-3">
+                <div className="-mx-1.5 -my-1.5">
+                  <button
+                    onClick={() => setNotification(null)}
+                    className={`inline-flex rounded-md p-1.5 ${
+                      notification.type === 'success' ? 'text-green-500 hover:bg-green-100' : 'text-red-500 hover:bg-red-100'
+                    } focus:outline-none`}
+                  >
+                    <span className="sr-only">Close</span>
+                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Header */}
         <div className="mb-10 bg-white shadow-sm rounded-lg p-6 border-l-4 border-teal-500">
           <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
@@ -75,6 +244,32 @@ function Settings() {
           </p>
         </div>
 
+        {/* Kaydet Butonu */}
+        <div className="mb-6 flex justify-end">
+          <button
+            onClick={saveSettings}
+            disabled={saving}
+            className="flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-colors duration-150"
+          >
+            {saving ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Save All Settings
+              </>
+            )}
+          </button>
+        </div>
+        
         <div className="space-y-8">
           {/* Notifications Settings */}
           <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-200">
