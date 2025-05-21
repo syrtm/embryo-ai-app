@@ -1,6 +1,10 @@
 @echo off
 echo Starting Embryo AI Application...
 
+:: Install backend requirements
+echo Installing backend requirements...
+pip install -r backend\requirements.txt
+
 :: Backend'i başlat
 start cmd /k "cd backend && python app.py"
 

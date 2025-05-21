@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import embryoLogo from '../assets/embryo-ai-logo.png';
+import '../styles/darkMode.css';
+import { useNotifications } from '../context/NotificationContext';
+import NotificationPanel from './NotificationPanel';
 
 function DashboardLayout({ children, userRole, onLogout }) {
   const location = useLocation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   const navigation = {
     patient: [
@@ -27,9 +32,22 @@ function DashboardLayout({ children, userRole, onLogout }) {
     ],
   };
 
+  useEffect(() => {
+    // Apply dark mode to the body element
+    if (isDarkMode) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+    
+    // Clean up when component unmounts
+    return () => {
+      document.body.classList.remove('dark-mode');
+    };
+  }, [isDarkMode]);
+
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
-    // In a real app, you would apply dark mode classes to the body or a parent element
   };
 
   const toggleUserMenu = () => {
@@ -52,16 +70,26 @@ function DashboardLayout({ children, userRole, onLogout }) {
           
           <div className="flex items-center space-x-4">
             {/* Notifications */}
-            <button className={`relative p-2 rounded-full transition-all duration-200 ${isDarkMode 
-              ? 'bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white' 
-              : 'bg-teal-500 bg-opacity-20 hover:bg-opacity-30 text-white hover:ring-2 hover:ring-teal-300'}`}
-              title="Notifications"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-amber-400 ring-2 ring-teal-600 animate-pulse"></span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotificationPanelOpen(!isNotificationPanelOpen)}
+                className={`relative p-2 rounded-full transition-all duration-200 ${isDarkMode 
+                  ? 'bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white' 
+                  : 'bg-teal-500 bg-opacity-20 hover:bg-opacity-30 text-white hover:ring-2 hover:ring-teal-300'}`}
+                title="Bildirimler"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-amber-900">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                )}
+              </button>
+              
+              {isNotificationPanelOpen && (
+                <NotificationPanel isDarkMode={isDarkMode} onClose={() => setIsNotificationPanelOpen(false)} />
+              )}
+            </div>
             
             {/* Dark mode toggle */}
             <button 
@@ -200,8 +228,15 @@ function DashboardLayout({ children, userRole, onLogout }) {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {children}
+      <main className={`max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-gray-900'} rounded-lg my-6 shadow-sm transition-colors duration-200`}>
+        <div className={`${isDarkMode ? 'dark-mode' : ''}`}>
+          {React.Children.map(children, child => {
+            // Clone each child component and pass the isDarkMode prop
+            return React.isValidElement(child) 
+              ? React.cloneElement(child, { isDarkMode })
+              : child;
+          })}
+        </div>
       </main>
       
       {/* Footer */}
@@ -210,7 +245,7 @@ function DashboardLayout({ children, userRole, onLogout }) {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex items-center space-x-2">
               <img src={embryoLogo} alt="EmbryoAI Logo" className="h-6 w-6" />
-              <span className="text-sm font-medium">EmbryoAI © {new Date().getFullYear()}</span>
+              <span className="text-sm font-medium">EmbryoAI &copy; {new Date().getFullYear()}</span>
             </div>
             <div className="flex space-x-6">
               <a href="#" className="text-sm hover:text-teal-500">Privacy Policy</a>

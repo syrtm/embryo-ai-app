@@ -16,6 +16,8 @@ import ForgotPassword from './components/ForgotPassword';
 import DashboardLayout from './components/DashboardLayout';
 import Patients from './components/Patients';
 import DoctorProfile from './pages/doctor/DoctorProfile';
+import EmbryoReport from './components/EmbryoReport';
+import { NotificationProvider } from './context/NotificationContext';
 
 function PatientRoutes({ onLogout }) {
   return (
@@ -28,6 +30,7 @@ function PatientRoutes({ onLogout }) {
         <Route path="/appointments" element={<Appointments />} />
         <Route path="/treatment" element={<TreatmentPlan />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/embryo-report/:id" element={<EmbryoReport />} />
       </Routes>
     </DashboardLayout>
   );
@@ -71,10 +74,11 @@ function App() {
   };
 
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-50">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
+    <NotificationProvider>
+      <Router>
+        <div className="min-h-screen bg-gray-50">
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
           <Route 
             path="/login" 
             element={
@@ -119,7 +123,8 @@ function App() {
           />
         </Routes>
       </div>
-    </Router>
+      </Router>
+    </NotificationProvider>
   );
 }
 

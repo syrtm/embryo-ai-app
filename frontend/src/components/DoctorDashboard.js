@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import embryoLogo from '../assets/embryo-ai-logo.png';
 
 function DoctorDashboard() {
@@ -12,6 +12,9 @@ function DoctorDashboard() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(today);
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [appointmentError, setAppointmentError] = useState(null);
 
   /* ------------------------------------------------------------------
    * Mock data (replace with real API calls once backend is ready)
@@ -99,6 +102,89 @@ function DoctorDashboard() {
     for (let d = 1; d <= daysInMonth; d += 1) cells.push(d);
     return cells;
   };
+
+  // Fetch upcoming appointments for the doctor
+  const fetchAppointments = async () => {
+    try {
+      setLoadingAppointments(true);
+      setAppointmentError(null);
+      
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.id) {
+        throw new Error('User not authenticated');
+      }
+      
+      const response = await fetch(`http://localhost:5000/api/appointments?user_id=${user.id}&role=doctor`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch appointments');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Sort appointments by date (upcoming first)
+        const sortedAppointments = data.appointments.sort((a, b) => {
+          return new Date(a.date_time) - new Date(b.date_time);
+        });
+        
+        // Filter to only show upcoming appointments
+        const upcoming = sortedAppointments.filter(appointment => {
+          return new Date(appointment.date_time) >= new Date();
+        });
+        
+        setUpcomingAppointments(upcoming);
+      } else {
+        throw new Error(data.message || 'Failed to fetch appointments');
+      }
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+      setAppointmentError(err.message);
+    } finally {
+      setLoadingAppointments(false);
+    }
+  };
+  
+  // Format date and time for display
+  const formatAppointmentDateTime = (dateTimeString) => {
+    const date = new Date(dateTimeString);
+    return {
+      date: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    };
+  };
+  
+  // Handle appointment status update
+  const handleAppointmentStatusUpdate = async (appointmentId, newStatus) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/appointments/${appointmentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh appointments list
+        fetchAppointments();
+      } else {
+        console.error('Failed to update appointment status:', data.message);
+      }
+    } catch (err) {
+      console.error('Error updating appointment status:', err);
+    }
+  };
+
+  /* ------------------------------------------------------------------
+   * Effects
+   * ----------------------------------------------------------------*/
+  useEffect(() => {
+    // Fetch appointments when component mounts
+    fetchAppointments();
+  }, []);
 
   /* ------------------------------------------------------------------
    * Render
@@ -336,11 +422,135 @@ function DoctorDashboard() {
                 
                 {!selectedPatient && (
                   <p className="text-xs text-amber-500 italic">
-                    Please select a patient first
+                    Please select a patient to proceed with analysis
                   </p>
                 )}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* ------------------------------------------------------------ */}
+        {/* Upcoming Appointments                                    */}
+        {/* ------------------------------------------------------------ */}
+        <section className="mb-6">
+          <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            Upcoming Appointments
+          </h2>
+          
+          <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'} rounded-xl shadow-sm border overflow-hidden p-6`}>
+            {loadingAppointments ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-teal-500"></div>
+              </div>
+            ) : appointmentError ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                <p className="text-red-600">{appointmentError}</p>
+                <button 
+                  onClick={fetchAppointments} 
+                  className="mt-2 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors text-sm"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : upcomingAppointments.length === 0 ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                <p className="text-gray-600">No upcoming appointments scheduled.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {upcomingAppointments.map((appointment) => {
+                  const { date, time } = formatAppointmentDateTime(appointment.date_time);
+                  return (
+                    <div 
+                      key={appointment.id} 
+                      className={`p-4 rounded-xl ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'} shadow-sm border-l-4 ${
+                        appointment.status === 'completed' ? 'border-green-500' : 
+                        appointment.status === 'cancelled' ? 'border-red-500' : 'border-teal-500'
+                      }`}
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-12 w-12 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 flex items-center justify-center text-white text-xl">
+                            👤
+                          </div>
+                          <div className="ml-4">
+                            <h3 className={`text-base font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {appointment.other_party_name}
+                            </h3>
+                            <div className="flex items-center mt-1">
+                              <span className="text-sm text-gray-500">{appointment.appointment_type}</span>
+                              {appointment.linked_embryo_id && (
+                                <>
+                                  <span className="mx-2 text-gray-300">•</span>
+                                  <span className={`text-xs px-2 py-1 rounded-full ${
+                                    appointment.embryo_grade === 'AA' || appointment.embryo_grade === '2-1-1' || appointment.embryo_grade === '3-1-1' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : appointment.embryo_grade === 'BB' || appointment.embryo_grade?.includes('2-2') || appointment.embryo_grade?.includes('3-2')
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : appointment.embryo_grade === 'Arrested' || appointment.embryo_grade?.includes('3-3')
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    Embryo: {appointment.embryo_grade || 'Unknown'}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 md:mt-0 text-right">
+                          <div className="flex items-center justify-end">
+                            <svg className="w-5 h-5 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-sm font-medium text-gray-700">{date}</span>
+                          </div>
+                          <div className="flex items-center justify-end mt-1">
+                            <svg className="w-5 h-5 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-sm font-medium text-gray-700">{time}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 flex flex-wrap gap-2 justify-end">
+                        <button 
+                          className="px-3 py-1.5 bg-teal-100 text-teal-800 rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center"
+                          onClick={() => window.open('https://meet.google.com', '_blank')}
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Join Meeting
+                        </button>
+                        
+                        <button 
+                          className="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors flex items-center"
+                          onClick={() => handleAppointmentStatusUpdate(appointment.id, 'completed')}
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                          Mark Completed
+                        </button>
+                        
+                        <button 
+                          className="px-3 py-1.5 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Reschedule
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
 
@@ -429,17 +639,17 @@ function DoctorDashboard() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Notifications</h2>
-                <button className="text-xs text-teal-600 hover:text-teal-700 font-medium">Mark all as read</button>
+                <h2 className="text-lg font-semibold notifications-title">Notifications</h2>
+                <button className="text-xs text-teal-500 hover:text-teal-400 font-medium">Mark all as read</button>
               </div>
               
               {/* Notification filters */}
               <div className="flex space-x-2 mb-4 overflow-x-auto pb-2">
-                <button className="px-3 py-1 bg-teal-100 text-teal-800 rounded-full text-xs font-medium whitespace-nowrap">All</button>
-                <button className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium whitespace-nowrap">Appointments</button>
-                <button className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium whitespace-nowrap">Messages</button>
-                <button className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium whitespace-nowrap">System</button>
-                <button className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium whitespace-nowrap">Analysis</button>
+                <button className="px-3 py-1 bg-teal-100 text-teal-800 dark-mode-button-active rounded-full text-xs font-medium whitespace-nowrap">All</button>
+                <button className="px-3 py-1 bg-gray-100 text-gray-800 dark-mode-button rounded-full text-xs font-medium whitespace-nowrap">Appointments</button>
+                <button className="px-3 py-1 bg-gray-100 text-gray-800 dark-mode-button rounded-full text-xs font-medium whitespace-nowrap">Messages</button>
+                <button className="px-3 py-1 bg-gray-100 text-gray-800 dark-mode-button rounded-full text-xs font-medium whitespace-nowrap">System</button>
+                <button className="px-3 py-1 bg-gray-100 text-gray-800 dark-mode-button rounded-full text-xs font-medium whitespace-nowrap">Analysis</button>
               </div>
               
               <div className="space-y-3">

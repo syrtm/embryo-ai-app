@@ -1,0 +1,192 @@
+/* Dark Mode Styles */
+.dark-mode {
+  /* General text and background colors */
+  color: #e2e8f0;
+}
+
+/* Apply dark mode to all elements */
+body.dark-mode,
+.dark-mode * {
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+
+/* Apply dark mode to card elements */
+.dark-mode .bg-white,
+.dark-mode [class*="bg-white"],
+.dark-mode div[style*="background-color: white"],
+.dark-mode div:not([class*="bg-slate-800"]):not([class*="bg-slate-900"]):not([class*="bg-gray-800"]):not([class*="bg-gray-900"]):not([class*="bg-teal-"]):not([class*="bg-green-"]):not([class*="bg-yellow-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-purple-"]) {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+/* Force all cards to dark mode */
+.dark-mode div[class*="rounded"],
+.dark-mode div[class*="shadow"],
+.dark-mode div[class*="card"],
+.dark-mode div[class*="p-"] {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+/* Improve readability of notification panels */
+.dark-mode .bg-white.rounded-lg,
+.dark-mode .notifications-panel,
+.dark-mode .bg-white.rounded-xl {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #334155 !important;
+}
+
+.dark-mode .notifications-panel h2,
+.dark-mode .notifications-panel .notification-title,
+.dark-mode .notifications-title {
+  color: #e2e8f0 !important;
+  font-weight: 600;
+}
+
+/* Enhanced notification panel styles */
+.dark-mode .notifications-panel .divide-gray-200 {
+  border-color: #334155 !important;
+}
+
+.dark-mode .notifications-panel .bg-blue-50 {
+  background-color: #1e3a5f !important;
+}
+
+.dark-mode .notifications-panel .text-blue-800 {
+  color: #93c5fd !important;
+}
+
+.dark-mode .notifications-panel .bg-green-100 {
+  background-color: #064e3b !important;
+}
+
+.dark-mode .notifications-panel .text-green-800 {
+  color: #6ee7b7 !important;
+}
+
+.dark-mode .notifications-panel .max-h-96 {
+  scrollbar-color: #475569 #1e293b;
+}
+
+.dark-mode .notifications-panel .max-h-96::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark-mode .notifications-panel .max-h-96::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark-mode .notifications-panel .max-h-96::-webkit-scrollbar-thumb {
+  background-color: #475569;
+  border-radius: 4px;
+}
+
+/* Improve readability of buttons */
+.dark-mode button.bg-gray-100,
+.dark-mode button.bg-gray-200,
+.dark-mode a.bg-gray-100,
+.dark-mode a.bg-gray-200,
+.dark-mode .dark-mode-button {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #475569 !important;
+}
+
+.dark-mode .dark-mode-button-active,
+.dark-mode button.bg-teal-100 {
+  background-color: #0f766e !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #134e4a !important;
+}
+
+/* Download PDF button */
+.dark-mode a[href*=".pdf"],
+.dark-mode button:has(svg[class*="download"]) {
+  background-color: #334155 !important;
+  color: #94a3b8 !important;
+  border: 1px solid #475569 !important;
+}
+
+/* Appointment action buttons */
+.dark-mode button.bg-gray-100,
+.dark-mode .reschedule-button {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #475569 !important;
+}
+
+.dark-mode button.confirm-button,
+.dark-mode button.bg-teal-100 {
+  background-color: #0f766e !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #134e4a !important;
+}
+
+.dark-mode .text-gray-900 {
+  color: #e2e8f0 !important;
+}
+
+.dark-mode .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+
+.dark-mode .text-gray-600,
+.dark-mode .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+/* Border colors */
+.dark-mode .border-gray-200,
+.dark-mode .border-gray-300 {
+  border-color: #334155 !important;
+}
+
+/* Button styles */
+.dark-mode button.bg-gray-100 {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark-mode button.bg-gray-100:hover {
+  background-color: #475569 !important;
+}
+
+/* Input fields */
+.dark-mode input,
+.dark-mode select,
+.dark-mode textarea {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Appointment cards */
+.dark-mode .bg-green-50 {
+  background-color: #0f3a2d !important;
+}
+
+.dark-mode .bg-yellow-100 {
+  background-color: #433619 !important;
+}
+
+.dark-mode .text-yellow-600 {
+  color: #fcd34d !important;
+}
+
+/* Embryo cards */
+.dark-mode .bg-purple-100 {
+  background-color: #4c1d95 !important;
+}
+
+.dark-mode .text-purple-800 {
+  color: #c4b5fd !important;
+}
+
+/* Shadows */
+.dark-mode .shadow-sm,
+.dark-mode .shadow-md,
+.dark-mode .shadow-lg {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2) !important;
+}

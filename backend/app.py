@@ -1,9 +1,17 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, make_response
 from flask_cors import CORS
 import sqlite3
 from werkzeug.security import generate_password_hash
 import os
 import re
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from datetime import datetime
 import bcrypt
 from werkzeug.utils import secure_filename
 import time
@@ -91,10 +99,52 @@ def init_db():
                 )
                 ''')
             print("Reports tablosu oluşturuldu!")
+            
+            # Randevular tablosu
+            cursor.execute('''
+                CREATE TABLE appointments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    patient_id INTEGER NOT NULL,
+                    doctor_id INTEGER NOT NULL,
+                    appointment_type TEXT NOT NULL,
+                    linked_embryo_id INTEGER,
+                    date_time TEXT NOT NULL,
+                    status TEXT DEFAULT 'scheduled',
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (patient_id) REFERENCES users (id),
+                    FOREIGN KEY (doctor_id) REFERENCES users (id),
+                    FOREIGN KEY (linked_embryo_id) REFERENCES reports (id)
+                )
+                ''')
+            print("Appointments tablosu oluşturuldu!")
         
             conn.commit()
         else:
-            print("Tablolar zaten mevcut.")
+            # Appointments tablosu var mı kontrol et, yoksa oluştur
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='appointments'")
+            if not cursor.fetchone():
+                print("Appointments tablosu oluşturuluyor...")
+                cursor.execute('''
+                    CREATE TABLE appointments (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        patient_id INTEGER NOT NULL,
+                        doctor_id INTEGER NOT NULL,
+                        appointment_type TEXT NOT NULL,
+                        linked_embryo_id INTEGER,
+                        date_time TEXT NOT NULL,
+                        status TEXT DEFAULT 'scheduled',
+                        notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (patient_id) REFERENCES users (id),
+                        FOREIGN KEY (doctor_id) REFERENCES users (id),
+                        FOREIGN KEY (linked_embryo_id) REFERENCES reports (id)
+                    )
+                ''')
+                conn.commit()
+                print("Appointments tablosu oluşturuldu!")
+            else:
+                print("Tüm tablolar zaten mevcut.")
         
         conn.close()
         
@@ -212,21 +262,54 @@ def login_user():
 @app.route('/api/patients', methods=['GET'])
 def get_patients():
     try:
+        # Veritabanında hasta yoksa örnek hastalar ekle
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'patient'")
+            count = cursor.fetchone()[0]
+            
+            # Eğer veritabanında hasta yoksa örnek hastalar ekle
+            if count == 0:
+                print("Veritabanında hasta bulunamadı. Örnek hastalar ekleniyor...")
+                sample_patients = [
+                    ('Emma Jhonson', 'emmajhonson@gmail.com', 'emmajhonson', 'password123', 'patient', 34),
+                    ('Emma Thompson', 'emma.thompson@example.com', 'emma', 'password123', 'patient', 34),
+                    ('Sarah Johnson', 'sarah.johnson@example.com', 'sarah', 'password123', 'patient', 29),
+                    ('Lisa Davis', 'lisa.davis@example.com', 'lisa', 'password123', 'patient', 31),
+                    ('Emily Brown', 'emily.brown@example.com', 'emily', 'password123', 'patient', 36)
+                ]
+                
+                for patient in sample_patients:
+                    try:
+                        hashed_password = bcrypt.hashpw(patient[3].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                        cursor.execute('''
+                            INSERT INTO users (full_name, email, username, password, role, age)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (patient[0], patient[1], patient[2], hashed_password, patient[4], patient[5]))
+                    except sqlite3.IntegrityError:
+                        print(f"Hasta {patient[0]} zaten mevcut, atlanıyor.")
+                        continue
+                
+                conn.commit()
+                print("Örnek hastalar eklendi.")
+            
+            # Tüm hastaları getir
             cursor.execute('''
                 SELECT id, full_name, email, username, age FROM users 
                 WHERE role = 'patient'
             ''')
             patients = cursor.fetchall()
+            
             return jsonify([{
                 'id': patient[0],
-                'name': patient[1],
+                'full_name': patient[1],  # Frontend'de full_name kullanılıyor
+                'name': patient[1],        # Geriye dönük uyumluluk için name de ekleyelim
                 'email': patient[2],
                 'username': patient[3],
                 'age': patient[4]
             } for patient in patients]), 200
     except Exception as e:
+        print(f"Hastalar getirilirken hata: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/user/<username>')
@@ -350,9 +433,18 @@ def get_doctor_patients():
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
             
+            # Doktor var mı kontrol et
+            cursor.execute("SELECT id FROM users WHERE id = ? AND role = 'doctor'", (doctor_id,))
+            doctor = cursor.fetchone()
+            if not doctor:
+                return jsonify({
+                    'success': False,
+                    'message': 'Geçersiz doktor ID\'si'
+                }), 404
+            
             # Önce doktorun seçtiği hastaları al
             cursor.execute('''
-                SELECT u.id, u.full_name, u.email, u.username,
+                SELECT u.id, u.full_name, u.email, u.username, u.age,
                        CASE WHEN dpr.doctor_id IS NOT NULL THEN 1 ELSE 0 END as is_selected
                 FROM users u
                 LEFT JOIN doctor_patient_relations dpr 
@@ -362,6 +454,24 @@ def get_doctor_patients():
             
             patients = cursor.fetchall()
             
+            # Eğer hiç hasta yoksa, get_patients fonksiyonunu çağır
+            if not patients:
+                print("Doktor için hasta bulunamadı, tüm hastalar getiriliyor...")
+                # get_patients fonksiyonunu çağırarak hastaları oluştur
+                get_patients()
+                
+                # Tekrar sorgula
+                cursor.execute('''
+                    SELECT u.id, u.full_name, u.email, u.username, u.age,
+                           CASE WHEN dpr.doctor_id IS NOT NULL THEN 1 ELSE 0 END as is_selected
+                    FROM users u
+                    LEFT JOIN doctor_patient_relations dpr 
+                        ON u.id = dpr.patient_id AND dpr.doctor_id = ?
+                    WHERE u.role = 'patient'
+                ''', (doctor_id,))
+                
+                patients = cursor.fetchall()
+            
             return jsonify({
                 'success': True,
                 'patients': [{
@@ -369,7 +479,8 @@ def get_doctor_patients():
                     'full_name': patient[1],
                     'email': patient[2],
                     'username': patient[3],
-                    'is_selected': bool(patient[4])
+                    'age': patient[4],
+                    'is_selected': bool(patient[5])
                 } for patient in patients]
             }), 200
 
@@ -498,9 +609,58 @@ def get_reports():
             }), 200
 
     except Exception as e:
+        print(f"Error fetching report: {str(e)}")
         return jsonify({
             'success': False,
-            'message': 'Raporlar listelenirken bir hata oluştu',
+            'message': 'Rapor alınırken bir hata oluştu',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/report/<int:report_id>', methods=['GET'])
+def get_report(report_id):
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            
+            # Raporu ID'ye göre getir
+            cursor.execute('''
+                SELECT r.*, 
+                       p.full_name as patient_name, 
+                       d.full_name as doctor_name
+                FROM reports r
+                INNER JOIN users p ON r.patient_id = p.id
+                INNER JOIN users d ON r.doctor_id = d.id
+                WHERE r.id = ?
+            ''', (report_id,))
+            
+            report = cursor.fetchone()
+            
+            if not report:
+                return jsonify({
+                    'success': False,
+                    'message': 'Rapor bulunamadı'
+                }), 404
+            
+            return jsonify({
+                'success': True,
+                'report': {
+                    'id': report[0],
+                    'patient_id': report[1],
+                    'doctor_id': report[2],
+                    'image_path': report[3],
+                    'result': report[4],
+                    'confidence': report[5],
+                    'notes': report[6],
+                    'created_at': report[7],
+                    'patient_name': report[8],
+                    'doctor_name': report[9]
+                }
+            }), 200
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': 'Rapor getirilirken bir hata oluştu',
             'error': str(e)
         }), 500
 
@@ -529,6 +689,198 @@ def reset_passwords():
         return jsonify({
             'success': False,
             'message': 'Şifreler güncellenirken bir hata oluştu'
+        }), 500
+
+@app.route('/api/appointments', methods=['POST'])
+def create_appointment():
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['patientId', 'doctorId', 'appointmentType', 'dateTime']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'{field} alanı gereklidir'
+                }), 400
+        
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            
+            # Check if patient and doctor exist
+            cursor.execute('SELECT id FROM users WHERE id = ? AND role = \'patient\'', (data['patientId'],))
+            if not cursor.fetchone():
+                return jsonify({
+                    'success': False,
+                    'message': 'Geçersiz hasta ID'
+                }), 404
+            
+            cursor.execute('SELECT id FROM users WHERE id = ? AND role = \'doctor\'', (data['doctorId'],))
+            if not cursor.fetchone():
+                return jsonify({
+                    'success': False,
+                    'message': 'Geçersiz doktor ID'
+                }), 404
+            
+            # Create the appointment
+            cursor.execute('''
+                INSERT INTO appointments (patient_id, doctor_id, appointment_type, linked_embryo_id, date_time, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                data['patientId'],
+                data['doctorId'],
+                data['appointmentType'],
+                data.get('linkedEmbryo'),  # Optional field
+                data['dateTime'],
+                data.get('notes')  # Optional field
+            ))
+            
+            appointment_id = cursor.lastrowid
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Randevu başarıyla oluşturuldu',
+                'appointmentId': appointment_id
+            }), 201
+    
+    except Exception as e:
+        print(f"Randevu oluşturma hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Randevu oluşturulurken bir hata oluştu',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/appointments', methods=['GET'])
+def get_appointments():
+    try:
+        user_id = request.args.get('userId')
+        role = request.args.get('role')
+        
+        if not user_id or not role:
+            return jsonify({
+                'success': False,
+                'message': 'userId ve role parametreleri gereklidir'
+            }), 400
+        
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            
+            if role == 'patient':
+                # Get appointments for a patient
+                cursor.execute('''
+                    SELECT a.*, u.full_name as doctor_name, r.result as embryo_grade
+                    FROM appointments a
+                    INNER JOIN users u ON a.doctor_id = u.id
+                    LEFT JOIN reports r ON a.linked_embryo_id = r.id
+                    WHERE a.patient_id = ?
+                    ORDER BY a.date_time ASC
+                ''', (user_id,))
+                
+                appointments = cursor.fetchall()
+                
+                return jsonify({
+                    'success': True,
+                    'appointments': [{
+                        'id': a[0],
+                        'patient_id': a[1],
+                        'doctor_id': a[2],
+                        'appointment_type': a[3],
+                        'linked_embryo_id': a[4],
+                        'date_time': a[5],
+                        'status': a[6],
+                        'notes': a[7],
+                        'created_at': a[8],
+                        'other_party_name': a[9],  # doctor_name
+                        'embryo_grade': a[10]
+                    } for a in appointments]
+                }), 200
+            
+            elif role == 'doctor':
+                # Get appointments for a doctor
+                cursor.execute('''
+                    SELECT a.*, u.full_name as patient_name, r.result as embryo_grade
+                    FROM appointments a
+                    INNER JOIN users u ON a.patient_id = u.id
+                    LEFT JOIN reports r ON a.linked_embryo_id = r.id
+                    WHERE a.doctor_id = ?
+                    ORDER BY a.date_time ASC
+                ''', (user_id,))
+                
+                appointments = cursor.fetchall()
+                
+                return jsonify({
+                    'success': True,
+                    'appointments': [{
+                        'id': a[0],
+                        'patient_id': a[1],
+                        'doctor_id': a[2],
+                        'appointment_type': a[3],
+                        'linked_embryo_id': a[4],
+                        'date_time': a[5],
+                        'status': a[6],
+                        'notes': a[7],
+                        'created_at': a[8],
+                        'other_party_name': a[9],  # patient_name
+                        'embryo_grade': a[10]
+                    } for a in appointments]
+                }), 200
+            
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Geçersiz rol'
+                }), 400
+    
+    except Exception as e:
+        print(f"Randevuları getirme hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Randevular alınırken bir hata oluştu',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/appointments/<int:appointment_id>', methods=['PUT'])
+def update_appointment_status(appointment_id):
+    try:
+        data = request.get_json()
+        
+        if 'status' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'status alanı gereklidir'
+            }), 400
+        
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            
+            # Check if appointment exists
+            cursor.execute('SELECT id FROM appointments WHERE id = ?', (appointment_id,))
+            if not cursor.fetchone():
+                return jsonify({
+                    'success': False,
+                    'message': 'Randevu bulunamadı'
+                }), 404
+            
+            # Update appointment status
+            cursor.execute('UPDATE appointments SET status = ? WHERE id = ?', 
+                         (data['status'], appointment_id))
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Randevu durumu güncellendi'
+            }), 200
+    
+    except Exception as e:
+        print(f"Randevu güncelleme hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Randevu güncellenirken bir hata oluştu',
+            'error': str(e)
         }), 500
 
 # Model sınıf tanımlamaları - embryo_classes.py dosyasından içe aktar
@@ -654,14 +1006,60 @@ def analyze_embryo():
     try:
         data = request.get_json()
         image_data = data.get('image')
+        patient_id = data.get('patient_id')
+        doctor_id = data.get('doctor_id')
+        notes = data.get('notes', '')
         
         if not image_data:
             return jsonify({
                 'success': False,
                 'error': 'Resim verisi bulunamadı'
             })
+        
+        if not patient_id or not doctor_id:
+            return jsonify({
+                'success': False,
+                'error': 'Hasta ID ve Doktor ID gereklidir'
+            })
             
+        # Analiz sonucunu al
         result = predict_embryo_class(image_data)
+        
+        if result['success']:
+            # Base64 görüntüyü kaydet
+            image_bytes = base64.b64decode(image_data.split(',')[1])
+            # Benzersiz dosya adı oluştur
+            unique_filename = f"{int(time.time())}_embryo.jpg"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            
+            # Uploads klasörünü oluştur
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            # Dosyayı kaydet
+            with open(filepath, 'wb') as f:
+                f.write(image_bytes)
+            
+            # Veritabanına raporu kaydet
+            with sqlite3.connect(DB_NAME) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO reports (patient_id, doctor_id, image_path, result, confidence, notes)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    patient_id,
+                    doctor_id,
+                    unique_filename,
+                    result['class'],
+                    result['confidence'],
+                    notes
+                ))
+                conn.commit()
+                
+                # Eklenen raporun ID'sini al
+                report_id = cursor.lastrowid
+                result['report_id'] = report_id
+                result['message'] = 'Rapor başarıyla kaydedildi'
+        
         return jsonify(result)
         
     except Exception as e:
@@ -669,6 +1067,174 @@ def analyze_embryo():
             'success': False,
             'error': str(e)
         })
+
+# Appointment endpoints
+# This duplicate route was removed to fix the conflict with the existing create_appointment function
+
+# This duplicate route was removed to fix the conflict with the existing get_appointments function
+
+@app.route('/api/appointments/<int:appointment_id>', methods=['PUT'])
+def update_appointment(appointment_id):
+    try:
+        data = request.get_json()
+        
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            
+            # Check if appointment exists
+            cursor.execute('SELECT id FROM appointments WHERE id = ?', (appointment_id,))
+            if not cursor.fetchone():
+                return jsonify({
+                    'success': False,
+                    'message': 'Appointment not found'
+                }), 404
+            
+            # Update fields that are provided
+            update_fields = []
+            update_values = []
+            
+            if 'status' in data:
+                update_fields.append('status = ?')
+                update_values.append(data['status'])
+            
+            if 'dateTime' in data:
+                update_fields.append('date_time = ?')
+                update_values.append(data['dateTime'])
+            
+            if 'notes' in data:
+                update_fields.append('notes = ?')
+                update_values.append(data['notes'])
+            
+            if not update_fields:
+                return jsonify({
+                    'success': False,
+                    'message': 'No fields to update'
+                }), 400
+            
+            # Build and execute the update query
+            update_query = f'''
+                UPDATE appointments
+                SET {', '.join(update_fields)}
+                WHERE id = ?
+            '''
+            
+            update_values.append(appointment_id)
+            cursor.execute(update_query, update_values)
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Appointment updated successfully'
+            }), 200
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': 'Error updating appointment',
+            'error': str(e)
+        }), 500
+
+# PDF oluşturma ve indirme endpoint'i
+@app.route('/api/reports/<int:report_id>/pdf', methods=['GET'])
+def generate_embryo_report_pdf(report_id):
+    print(f"PDF oluşturma isteği alındı: report_id={report_id}")
+    try:
+        # Kullanıcı kimliğini doğrula
+        user_id = request.args.get('userId')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': 'Kullanıcı kimliği gerekli'
+            }), 400
+        
+        # Veritabanı bağlantısı oluştur
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Raporu veritabanından al
+        cursor.execute('''
+            SELECT r.*, 
+                   p.full_name as patient_name, 
+                   d.full_name as doctor_name
+            FROM reports r
+            JOIN users p ON r.patient_id = p.id
+            JOIN users d ON r.doctor_id = d.id
+            WHERE r.id = ?
+        ''', (report_id,))
+        
+        report = cursor.fetchone()
+        
+        if not report:
+            return jsonify({
+                'success': False,
+                'message': 'Rapor bulunamadı'
+            }), 404
+        
+        # Kullanıcının bu raporu görüntüleme yetkisi var mı kontrol et
+        if str(report['patient_id']) != user_id and str(report['doctor_id']) != user_id:
+            return jsonify({
+                'success': False,
+                'message': 'Bu raporu görüntüleme yetkiniz yok'
+            }), 403
+        
+        # PDF oluşturucu modülünü import et
+        from pdf_generator import generate_embryo_report_pdf as pdf_generator
+        
+        # Report nesnesini sözlük olarak dönüştür
+        report_dict = dict(report)
+        
+        # PDF oluştur
+        pdf_content = pdf_generator(report_dict)
+        
+        # PDF'i döndür
+        response = make_response(pdf_content)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=embriyo-rapor-{report_id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        print(f"PDF oluşturma hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'PDF oluşturulurken bir hata oluştu',
+            'error': str(e)
+        }), 500
+
+# Medikal kayıtlar için PDF endpoint'i
+@app.route('/api/medical-records/<int:record_id>/pdf', methods=['GET'])
+def generate_medical_record_pdf(record_id):
+    print(f"Medikal kayıt PDF isteği alındı: record_id={record_id}")
+    try:
+        # Kullanıcı kimliğini doğrula
+        user_id = request.args.get('userId')
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': 'Kullanıcı kimliği gerekli'
+            }), 400
+        
+        # PDF oluşturucu modülünü import et
+        from pdf_generator import generate_medical_record_pdf as pdf_generator
+        
+        # PDF oluştur
+        pdf_content = pdf_generator(record_id)
+        
+        # PDF'i döndür
+        response = make_response(pdf_content)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=medikal-kayit-{record_id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        print(f"PDF oluşturma hatası: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'PDF oluşturulurken bir hata oluştu',
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     init_db()

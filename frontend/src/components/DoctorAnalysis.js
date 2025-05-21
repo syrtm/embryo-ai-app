@@ -22,28 +22,55 @@ function DoctorAnalysis() {
       reader.onload = async (e) => {
         const imageData = e.target.result;
         setSelectedImage(imageData);
+        setIsAnalyzing(true);
         
-    try {
-          // Model tahminini al
+        try {
+          // Kullanıcı bilgilerini al
+          const user = JSON.parse(localStorage.getItem('user'));
+          if (!user || !user.id) {
+            console.error('Kullanıcı bilgisi bulunamadı');
+            return;
+          }
+          
+          // Hasta ID'si seçili hastadan, doktor ID'si giriş yapmış kullanıcıdan al
+          const patientId = selectedPatient?.id;
+          const doctorId = user.id;
+          
+          if (!patientId) {
+            console.error('Hasta ID bulunamadı');
+            return;
+          }
+          
+          // Model tahminini al ve raporu kaydet
           const response = await fetch('http://localhost:5000/api/analyze-embryo', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ image: imageData })
+            body: JSON.stringify({ 
+              image: imageData,
+              patient_id: patientId,
+              doctor_id: doctorId,
+              notes: `Embryo analysis for ${displayName}`
+            })
           });
           
           const result = await response.json();
           if (result.success) {
-        setAnalysisResult({
+            setAnalysisResult({
               class: result.class,
-              details: result.details
+              details: result.details,
+              report_id: result.report_id,
+              message: result.message
             });
+            console.log('Rapor başarıyla kaydedildi:', result.message);
           } else {
             console.error('Tahmin hatası:', result.error);
           }
-    } catch (error) {
+        } catch (error) {
           console.error('API hatası:', error);
+        } finally {
+          setIsAnalyzing(false);
         }
       };
       reader.readAsDataURL(file);
@@ -146,8 +173,10 @@ function DoctorAnalysis() {
                   <div className="space-y-4">
                     <img src={selectedImage} alt="Embryo" className="max-w-full h-auto mx-auto rounded-lg shadow-md" />
                     <div className="text-center">
-                      <p className={`${isDarkMode ? 'text-teal-300' : 'text-teal-600'} font-medium`}>Image uploaded successfully</p>
-                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Ready for analysis</p>
+                      <p className={`${isDarkMode ? 'text-teal-300' : 'text-teal-600'} font-medium`}>
+                        🧬 {displayName ? `${displayName} – ` : ''}Embriyo #{Math.floor(Math.random() * 5) + 1} (3. Gün)
+                      </p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Analiz için hazır</p>
                     </div>
                     <div className="flex justify-center mt-4">
                       <input
@@ -250,8 +279,24 @@ function DoctorAnalysis() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                   <div className="flex items-center space-x-3">
-                    <div className={`px-4 py-2 rounded-lg font-bold text-2xl ${isDarkMode ? 'bg-teal-900 text-teal-200' : 'bg-teal-100 text-teal-800'} shadow-sm`}>
+                    <div className={`px-4 py-2 rounded-lg font-bold text-2xl ${isDarkMode ? 'bg-teal-900 text-teal-200' : 'bg-teal-100 text-teal-800'} shadow-sm relative group cursor-help`}>
                       Sınıf: {analysisResult.class}
+                      <div className="absolute invisible group-hover:visible bg-white text-gray-800 p-2 rounded shadow-lg w-64 z-10 bottom-full left-1/2 transform -translate-x-1/2 mb-2 text-sm font-normal">
+                        <div className="text-xs font-medium text-gray-500 mb-1">Sınıf Kodu Açıklaması:</div>
+                        {analysisResult.class.includes('-') ? (
+                          <>
+                            <div>Format: <span className="font-medium">Hücre-Fragmentasyon-Simetri</span></div>
+                            <div className="mt-1">
+                              <div>1: Düşük/İyi</div>
+                              <div>2: Orta</div>
+                              <div>3: Yüksek/Kötü</div>
+                            </div>
+                          </>
+                        ) : (
+                          <div>Özel sınıf: {analysisResult.class}</div>
+                        )}
+                        <div className="absolute w-3 h-3 bg-white transform rotate-45 left-1/2 -translate-x-1/2 -bottom-1.5"></div>
+                      </div>
                     </div>
                     {analysisResult.confidence && (
                       <div className={`px-3 py-1 rounded-lg text-sm ${isDarkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`}>
@@ -269,24 +314,65 @@ function DoctorAnalysis() {
                     </svg>
                     Detaylı Değerlendirme
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    {Object.entries(analysisResult.details).map(([key, value]) => (
-                      <div key={key} className="flex flex-col p-3 bg-gray-50 rounded-md">
-                        <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} capitalize`}>{key}</span>
-                        <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {typeof value === 'object' ? 
-                            // If it's the vizuel object, render it properly
-                            Object.entries(value).map(([vizKey, vizValue]) => (
-                              <div key={vizKey} className="flex items-center mt-1">
-                                <span className="text-xs text-gray-500 mr-2">{vizKey.replace('_yildiz', '')}:</span>
-                                <span>{vizValue}</span>
-                              </div>
-                            ))
-                            : value
-                          }
-                        </span>
+                  
+                  {/* Summary paragraph */}
+                  <div className={`p-3 mb-4 rounded-md ${isDarkMode ? 'bg-slate-600 text-white' : 'bg-teal-50 text-teal-800'} text-sm`}>
+                    {analysisResult.details.açıklama || 
+                      `Bu embriyo ${analysisResult.details.hücre_sayısı || ''} hücreli, ${analysisResult.details.fragmentasyon || ''} fragmentasyon ve ${analysisResult.details.simetri || ''} simetri özelliklerine sahiptir. ${analysisResult.details.transfer_uygunlugu || ''}`
+                    }
+                  </div>
+                  
+                  {/* Key embryo characteristics in a single row */}
+                  <div className="flex flex-wrap mb-4 gap-2">
+                    {analysisResult.details.hücre_sayısı && (
+                      <div className={`px-3 py-1.5 rounded-md ${isDarkMode ? 'bg-slate-600' : 'bg-gray-100'}`}>
+                        <span className="font-semibold mr-1">Hücre Sayısı:</span>
+                        <span>{analysisResult.details.hücre_sayısı}</span>
                       </div>
-                    ))}
+                    )}
+                    {analysisResult.details.simetri && (
+                      <div className={`px-3 py-1.5 rounded-md ${isDarkMode ? 'bg-slate-600' : 'bg-gray-100'}`}>
+                        <span className="font-semibold mr-1">Simetri:</span>
+                        <span>{analysisResult.details.simetri}</span>
+                      </div>
+                    )}
+                    {analysisResult.details.fragmentasyon && (
+                      <div className={`px-3 py-1.5 rounded-md ${isDarkMode ? 'bg-slate-600' : 'bg-gray-100'}`}>
+                        <span className="font-semibold mr-1">Fragmentasyon:</span>
+                        <span>{analysisResult.details.fragmentasyon}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Star ratings with improved visualization */}
+                  {analysisResult.details.vizuel && (
+                    <div className="mb-4 p-3 rounded-md bg-gray-50">
+                      <h4 className="text-sm font-semibold mb-2 text-gray-700">Kalite Değerlendirmesi</h4>
+                      <div className="space-y-2">
+                        {Object.entries(analysisResult.details.vizuel).map(([key, value]) => (
+                          <div key={key} className="flex items-center">
+                            <span className="font-medium w-32 text-gray-700">{key.replace('_yildiz', '')}:</span>
+                            <span className="text-xl tracking-widest text-yellow-500">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Simplified risk note and transfer suitability */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {analysisResult.details.risk_notu && (
+                      <div className={`p-3 rounded-md ${isDarkMode ? 'bg-blue-900 text-blue-100' : 'bg-blue-50 text-blue-800'}`}>
+                        <h4 className="text-sm font-semibold mb-1">Değerlendirme</h4>
+                        <p className="text-sm">{analysisResult.details.risk_notu.replace('implantasyon şansı', 'implantasyon potansiyeli')}</p>
+                      </div>
+                    )}
+                    {analysisResult.details.transfer_uygunlugu && (
+                      <div className={`p-3 rounded-md ${isDarkMode ? 'bg-teal-900 text-teal-100' : 'bg-teal-50 text-teal-800'}`}>
+                        <h4 className="text-sm font-semibold mb-1">Transfer Önerisi</h4>
+                        <p className="text-sm">{analysisResult.details.transfer_uygunlugu}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

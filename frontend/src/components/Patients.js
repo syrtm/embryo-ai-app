@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Mock veriler
-const mockPatients = [
-  { id: 'mock1', full_name: 'Emma Thompson', email: 'emma.thompson@example.com', username: 'emma', is_mock: true, age: 34 },
-  { id: 'mock2', full_name: 'Sarah Johnson', email: 'sarah.johnson@example.com', username: 'sarah', is_mock: true, age: 29 },
-  { id: 'mock3', full_name: 'Lisa Davis', email: 'lisa.davis@example.com', username: 'lisa', is_mock: true, age: 31 },
-  { id: 'mock4', full_name: 'Emily Brown', email: 'emily.brown@example.com', username: 'emily', is_mock: true, age: 36 }
-];
-
 // Tekilleştirme fonksiyonu (email VEYA username aynıysa tekilleştir)
 function uniqueBy(arr) {
   const seen = new Set();
@@ -23,19 +15,23 @@ function uniqueBy(arr) {
 function Patients() {
   const [search, setSearch] = useState('');
   const [patients, setPatients] = useState([]);
+  const [doctorPatients, setDoctorPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPatient, setSelectedPatient] = useState(null);
   const navigate = useNavigate();
 
-  // Mock hastaları sadece ilk yüklemede ekle
+  // Hastaları API'den çek
   useEffect(() => {
-    setPatients(mockPatients);
+    fetchPatients();
   }, []);
 
   const handleSelectPatient = async (patientId, patient) => {
     try {
+      // Hasta seçimi için API çağrısı yap
       const user = JSON.parse(localStorage.getItem('user'));
+      console.log('API çağrısı yapılıyor, doctor_id:', user.id, 'patient_id:', patientId);
+      
       const response = await fetch('http://localhost:5000/api/doctor/select-patient', {
         method: 'POST',
         headers: {
@@ -48,6 +44,8 @@ function Patients() {
       });
 
       const data = await response.json();
+      console.log('API yanıtı:', data);
+      
       if (data.success) {
         setSelectedPatient(patientId);
         fetchPatients();
@@ -59,14 +57,15 @@ function Patients() {
         };
         navigate('/doctor/analysis', { state: { patient: patientForAnalysis } });
       } else {
-        setError(data.message);
+        setError(data.message || 'Hasta seçilirken bir hata oluştu');
       }
     } catch (err) {
+      console.error('Hasta seçilirken hata:', err);
       setError('Hasta seçilirken bir hata oluştu');
     }
   };
 
-  // fetchPatients sadece veritabanı hastalarını günceller, mock'ları tekrar eklemez
+  // fetchPatients API'den hastaları çeker, gerçek veritabanı verilerini kullanır
   const fetchPatients = async () => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));
@@ -74,22 +73,55 @@ function Patients() {
         navigate('/login');
         return;
       }
-      const response = await fetch(`http://localhost:5000/api/doctor/patients?doctor_id=${user.id}`);
-      const data = await response.json();
-      if (data.success) {
-        const dbPatients = data.patients.map(patient => ({
-          ...patient,
-          is_mock: false
-        }));
-        setPatients(prev => [
-          ...dbPatients,
-          ...prev.filter(p => p.is_mock)
-        ]);
-      } else {
-        setError(data.message);
+      
+      setLoading(true);
+      setError('');
+      
+      // Önce doktorun hastalarını çek
+      try {
+        const response = await fetch(`http://localhost:5000/api/doctor/patients?doctor_id=${user.id}`);
+        const doctorData = await response.json();
+        console.log('Doktor hastaları API yanıtı:', doctorData);
+        
+        if (doctorData.success && Array.isArray(doctorData.patients) && doctorData.patients.length > 0) {
+          console.log('Doktor hastaları bulundu:', doctorData.patients.length);
+          setDoctorPatients(doctorData.patients);
+          setPatients(doctorData.patients);
+          setLoading(false);
+          return;
+        } else {
+          console.log('Doktor için hasta bulunamadı veya hata oluştu, tüm hastalar getiriliyor');
+          
+          // Doktor hastaları yoksa veya hata varsa, tüm hastaları çek
+          try {
+            const allPatientsResponse = await fetch('http://localhost:5000/api/patients');
+            const data = await allPatientsResponse.json();
+            console.log('Tüm hastalar API yanıtı:', data);
+            
+            if (Array.isArray(data) && data.length > 0) {
+              // Veritabanı verilerini kullan
+              const dbPatients = data.map(p => ({
+                ...p,
+                is_mock: false
+              }));
+              console.log('Veritabanı hastaları:', dbPatients);
+              setPatients(dbPatients);
+            } else {
+              console.log('API geçerli bir dizi dönmedi veya boş dizi döndü');
+              setError('Hasta verisi bulunamadı');
+            }
+          } catch (apiError) {
+            console.error('Hastalar çekilirken API hatası:', apiError);
+            setError('Hastalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+          }
+        }
+      } catch (doctorApiError) {
+        console.error('Doktor hastaları çekilirken API hatası:', doctorApiError);
+        setError('Doktor hastaları yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
       }
     } catch (err) {
-      setError('Hastalar yüklenirken bir hata oluştu');
+      console.error('Genel hata:', err);
+      setError('Hastalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     } finally {
       setLoading(false);
     }
@@ -101,14 +133,29 @@ function Patients() {
   }, [navigate]);
 
   // Filtrelenmiş ve tekilleştirilmiş hasta listesi
+  console.log('Filtreleme öncesi hastalar:', patients);
+  
   const filteredPatients = uniqueBy(
     patients
-      .filter(p =>
-        (p.full_name.toLowerCase().includes(search.toLowerCase()) ||
-        p.email.toLowerCase().includes(search.toLowerCase()))
-        && !(p.username && p.username.startsWith('demo')) // demo usernamelileri çıkar
-      )
+      .filter(p => {
+        // Null/undefined kontrolleri ekleyelim
+        const fullName = p.full_name || p.name || '';
+        const email = p.email || '';
+        const username = p.username || '';
+        
+        const nameMatch = fullName.toLowerCase().includes(search.toLowerCase());
+        const emailMatch = email.toLowerCase().includes(search.toLowerCase());
+        const isDemoUser = username && username.startsWith('demo');
+        
+        const shouldInclude = (search === '' || nameMatch || emailMatch) && !isDemoUser;
+        
+        console.log(`Hasta ${fullName} (${email}): nameMatch=${nameMatch}, emailMatch=${emailMatch}, isDemoUser=${isDemoUser}, shouldInclude=${shouldInclude}`);
+        
+        return shouldInclude;
+      })
   );
+  
+  console.log('Filtreleme sonrası hastalar:', filteredPatients);
 
   if (loading) {
     return (
@@ -141,13 +188,13 @@ function Patients() {
           <div key={patient.id} className="bg-white rounded-xl shadow p-5 flex items-center space-x-4 border border-gray-100">
             <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center">
               <span className="text-2xl text-teal-600">
-                {patient.full_name.charAt(0)}
+                {(patient.full_name || patient.name || '?').charAt(0)}
               </span>
             </div>
             <div className="flex-grow">
-              <h2 className="text-lg font-semibold">{patient.full_name}</h2>
-              <p className="text-sm text-gray-500">{patient.email}</p>
-              <p className="text-sm text-gray-500">@{patient.username}</p>
+              <h2 className="text-lg font-semibold">{patient.full_name || patient.name || 'İsimsiz Hasta'}</h2>
+              <p className="text-sm text-gray-500">{patient.email || 'E-posta yok'}</p>
+              <p className="text-sm text-gray-500">@{patient.username || 'kullanıcı-adı-yok'}</p>
               {patient.is_mock && (
                 <span className="inline-block px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-full mt-1">
                   Demo Hasta

@@ -9,3 +9,4 @@ torch
 torchvision
 pillow
 flask-cors
+reportlab==4.4.1

@@ -1,0 +1,9 @@
+flask==2.0.1
+flask-cors==3.0.10
+sqlite3==3.36.0
+werkzeug==2.0.1
+bcrypt==3.2.0
+torch==1.9.0
+torchvision==0.10.0
+pillow==8.3.1
+reportlab==4.4.1
