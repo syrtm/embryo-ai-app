@@ -8,7 +8,7 @@ EMBRYO_CLASSES = {
         'transfer_uygunlugu': 'Klinik değerlendirmeye bağlı olarak transfer için değerlendirilebilir. Daha iyi kalitede embriyo varsa, öncelik verilebilir.',
         'risk_notu': 'Morfolojik yapısı göz önünde bulundurularak implantasyon potansiyeli orta düzeyde değerlendirilebilir.',
         'vizuel': {
-            'fragmentasyon_yildiz': '★★★★☆',
+            'fragmentasyon yildiz': '★★★★☆',
             'simetri_yildiz': '★★★★☆',
             'genel_kalite': '★★★★☆'
         }
