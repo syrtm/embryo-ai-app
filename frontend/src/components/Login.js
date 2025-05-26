@@ -32,6 +32,9 @@ function Login({ onLogin }) {
       }
 
       if (data.success) {
+        // Store token and username in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('username', data.user.username);
         localStorage.setItem('user', JSON.stringify(data.user));
         onLogin({ ...credentials, role: data.user.role });
         navigate(data.user.role === 'doctor' ? '/doctor' : '/patient');
