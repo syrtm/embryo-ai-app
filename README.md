@@ -98,6 +98,3 @@ Contributions are welcome! If you'd like to contribute, please follow these step
 5. Push to the branch (`git push origin feature/your-feature-name`)
 6. Open a Pull Request
 
-## License
-
-[Specify your project's license here]
